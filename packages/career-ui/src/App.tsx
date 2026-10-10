@@ -10,7 +10,6 @@ import {
   fetchState,
   fetchWorldClock,
   fetchCompanies,
-  fetchWorldPresence,
   postCompany,
   postCompanySessionOpen,
   fetchCareerProfiles,
@@ -1100,6 +1099,8 @@ function regionLabel(region: string): string {
       return 'U.S. Virgin Islands';
     case 'US-HI':
       return 'USA — Hawaii';
+    case 'US-AK':
+      return 'USA — Alaska';
     case 'US-GU':
       return 'USA — Guam';
     case 'US-AS':
@@ -3979,10 +3980,6 @@ export function App() {
   >([]);
   /** VA-listed company + non-owner → Hangar MX/sell locked (ferry ok). */
   const [vaHangarMutationsLocked, setVaHangarMutationsLocked] = useState(false);
-  const [worldPresence, setWorldPresence] = useState<{
-    onlineCount: number;
-    recent: Array<{ companyDisplayName: string; summary: string }>;
-  } | null>(null);
 
   useEffect(() => {
     setActiveCompanyIdForRequests(activeCompanyId);
@@ -4173,36 +4170,6 @@ export function App() {
   const sawWorldFixedRef = useRef(false);
   /** Desktop play mode for mid-deploy WorldWaiting vs ProfileGate. */
   const playModeRef = useRef<'sp' | 'mp' | null>(null);
-
-  useEffect(() => {
-    if (!careerReady || showAuthGate || !(authRequired || worldFixed)) {
-      setWorldPresence(null);
-      return;
-    }
-    let cancelled = false;
-    const pull = () => {
-      void fetchWorldPresence()
-        .then((p) => {
-          if (cancelled) return;
-          setWorldPresence({
-            onlineCount: p.onlineCount,
-            recent: (p.recent ?? []).slice(0, 5).map((r) => ({
-              companyDisplayName: r.companyDisplayName,
-              summary: r.summary,
-            })),
-          });
-        })
-        .catch(() => {
-          /* presence is best-effort */
-        });
-    };
-    pull();
-    const id = window.setInterval(pull, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [careerReady, authRequired, worldFixed, showAuthGate]);
 
   /** Electron: first-run / Settings switch between SP and MP. */
   const [playModeGate, setPlayModeGate] = useState<
@@ -15167,21 +15134,6 @@ export function App() {
           <div className="topbar-metrics">
             {catchUpBanner ? (
               <EconomySyncIndicator status={catchUpBanner} />
-            ) : null}
-            {careerReady && (authRequired || worldFixed) && worldPresence ? (
-              <div
-                className="metric"
-                title={
-                  worldPresence.recent.length > 0
-                    ? worldPresence.recent
-                        .map((r) => `${r.companyDisplayName}: ${r.summary}`)
-                        .join('\n')
-                    : 'Pilots with a live session on this world (last seen ≤5 min)'
-                }
-              >
-                <span className="label">Online</span>
-                <strong>{worldPresence.onlineCount}</strong>
-              </div>
             ) : null}
             {careerReady ? (
               authRequired || worldFixed ? (

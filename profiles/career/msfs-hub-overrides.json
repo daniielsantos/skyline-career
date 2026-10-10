@@ -841,7 +841,7 @@
     "lat": 47.43291947990656,
     "lon": 0.7245679199695587,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "LFRD": {
     "name": "Pleurtuit-St Malo",
@@ -12259,7 +12259,7 @@
     "lat": 41.70429065823555,
     "lon": -4.860603511333466,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "LEVX": {
     "name": "Vigo",
@@ -22483,7 +22483,7 @@
       }
     ]
   },
-  "UTNN": {
+  "UZNN": {
     "name": "Nukus",
     "lat": 42.48921096324921,
     "lon": 59.622744619846344,
@@ -22512,44 +22512,68 @@
       }
     ]
   },
-  "UTSB": {
-    "name": "Bukhara International",
+  "UZSB": {
+    "name": "Bukhara International Airport",
     "lat": 39.775283485651016,
     "lon": 64.48227792978287,
     "source": "msfs_facility",
-    "validatedAt": "2026-09-05"
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 10.199999809265137,
+        "lengthM": 3000.146484375,
+        "widthM": 45.11040115356445,
+        "lat": 39.775269739329815,
+        "lon": 64.48228284716606,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
   },
-  "UTSS": {
-    "name": "Samarkand International",
+  "UZSS": {
+    "name": "Samarkand International Airport",
     "lat": 39.70165282487869,
     "lon": 66.98243871331215,
     "source": "msfs_facility",
-    "validatedAt": "2026-09-05"
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 95.69999694824219,
+        "lengthM": 3104.99755859375,
+        "widthM": 45.11040115356445,
+        "lat": 39.7017078101635,
+        "lon": 66.98180079460144,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
   },
-  "UTTT": {
-    "name": "Yuzhny",
-    "lat": 41.25666651874781,
-    "lon": 69.28166672587395,
+  "UZTT": {
+    "name": "Islam Karimov Intl",
+    "lat": 41.257488951087,
+    "lon": 69.28097203373909,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03",
+    "validatedAt": "2026-10-10",
     "runways": [
       {
         "ident": "8L",
-        "headingTrueDeg": 81.6500015258789,
-        "lengthM": 3998.7041015625,
-        "widthM": 62.06178665161133,
-        "lat": 41.258414313197136,
-        "lon": 69.28075522184372,
+        "headingTrueDeg": 81.69999694824219,
+        "lengthM": 3999.890380859375,
+        "widthM": 60.04560089111328,
+        "lat": 41.25842168927193,
+        "lon": 69.28084954619408,
         "identReciprocal": "26R",
         "surface": "asphalt"
       },
       {
         "ident": "8R",
-        "headingTrueDeg": 81.6456527709961,
-        "lengthM": 3904.14990234375,
-        "widthM": 42.68235778808594,
-        "lat": 41.256545819342136,
-        "lon": 69.28116381168365,
+        "headingTrueDeg": 81.69999694824219,
+        "lengthM": 3905.09765625,
+        "widthM": 45.11040115356445,
+        "lat": 41.25655051320791,
+        "lon": 69.28120940923691,
         "identReciprocal": "26L",
         "surface": "asphalt"
       }
@@ -31683,12 +31707,44 @@
       }
     ]
   },
-  "KPBI": {
-    "name": "Palm Beach International",
-    "lat": 26.68316077440977,
-    "lon": -80.09558871388435,
+  "KDJT": {
+    "name": "President Donald J. Trump Intern",
+    "lat": 26.683161109685898,
+    "lon": -80.0955918431282,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-30"
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10L",
+        "headingTrueDeg": 92.80000305175781,
+        "lengthM": 3048.3046875,
+        "widthM": 45.720001220703125,
+        "lat": 26.682516038417816,
+        "lon": -80.0924500823021,
+        "identReciprocal": "28R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10R",
+        "headingTrueDeg": 92.80000305175781,
+        "lengthM": 979.627197265625,
+        "widthM": 22.860000610351562,
+        "lat": 26.68097410351038,
+        "lon": -80.10136172175407,
+        "identReciprocal": "28L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 135.1999969482422,
+        "lengthM": 2112.56884765625,
+        "widthM": 45.720001220703125,
+        "lat": 26.685497649013996,
+        "lon": -80.09697496891022,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
   },
   "SBAN": {
     "name": "Anapolis Air Base",
@@ -33443,7 +33499,7 @@
     "lat": 47.754688672721386,
     "lon": -3.432026356458664,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "LFRN": {
     "name": "St Jacques",
@@ -33479,7 +33535,7 @@
     "lat": 43.08968849480152,
     "lon": 6.148924380540848,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "LIBP": {
     "name": "Pescara",
@@ -45703,7 +45759,7 @@
     "lat": 36.714443787932396,
     "lon": 127.49049872159958,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "RPLI": {
     "name": "Laoag Intl",
@@ -48957,7 +49013,7 @@
     "lat": 51.565515249967575,
     "lon": 4.93251845240593,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "EHHO": {
     "name": "Hoogeveen",
@@ -49443,14 +49499,14 @@
     "lat": 37.135564014315605,
     "lon": -3.636423647403717,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "LEGT": {
     "name": "Getafe Air Base",
     "lat": 40.297620221972466,
     "lon": -3.7149538099765778,
     "source": "msfs_facility",
-    "validatedAt": "2026-10-03"
+    "validatedAt": "2026-10-10"
   },
   "LEMI": {
     "name": "RegiÃ³n de Murcia International",
@@ -53139,21 +53195,21 @@
       }
     ]
   },
-  "UTFN": {
+  "UZFN": {
     "name": "Namangan",
     "lat": 40.9848665446043,
     "lon": 71.55684158205986,
     "source": "msfs_facility",
-    "validatedAt": "2026-09-19",
+    "validatedAt": "2026-10-10",
     "runways": [
       {
-        "ident": "28",
-        "headingTrueDeg": 288.6862487792969,
-        "lengthM": 3271.933837890625,
-        "widthM": 53.682281494140625,
-        "lat": 40.984887667000294,
-        "lon": 71.55680045485497,
-        "identReciprocal": "10",
+        "ident": "10",
+        "headingTrueDeg": 108.5,
+        "lengthM": 3275.075927734375,
+        "widthM": 45.11040115356445,
+        "lat": 40.98487660288811,
+        "lon": 71.55689880251884,
+        "identReciprocal": "28",
         "surface": "asphalt"
       }
     ]
@@ -55885,6 +55941,6922 @@
         "lat": -17.58040487766266,
         "lon": 123.82860884070396,
         "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KACK": {
+    "name": "Nantucket Memorial",
+    "lat": 41.25297512859106,
+    "lon": -70.05991101264954,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 45.010826110839844,
+        "lengthM": 1914.3741455078125,
+        "widthM": 45.720001220703125,
+        "lat": 41.25304251909256,
+        "lon": -70.06445422768593,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 107.19622039794922,
+        "lengthM": 820.73291015625,
+        "widthM": 15.24000072479248,
+        "lat": 41.2516900151968,
+        "lon": -70.05752742290497,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 135.01107788085938,
+        "lengthM": 1355.9326171875,
+        "widthM": 30.48000144958496,
+        "lat": 41.25365439802408,
+        "lon": -70.05504727363586,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KAPF": {
+    "name": "Naples Muni",
+    "lat": 26.152441799640656,
+    "lon": -81.77563905715942,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 134.374267578125,
+        "lengthM": 1524.33837890625,
+        "widthM": 30.117151260375977,
+        "lat": 26.152827367186546,
+        "lon": -81.7747937142849,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.06431579589844,
+        "lengthM": 2012.064697265625,
+        "widthM": 45.720001220703125,
+        "lat": 26.152722090482712,
+        "lon": -81.77547186613083,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBDR": {
+    "name": "Igor I Sikorsky Memorial",
+    "lat": 41.163480542600155,
+    "lon": -73.12617480754852,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 45.1470832824707,
+        "lengthM": 1428.2099609375,
+        "widthM": 45.475711822509766,
+        "lat": 41.16159863770008,
+        "lon": -73.12594145536423,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 97.8447036743164,
+        "lengthM": 1451.6173095703125,
+        "widthM": 46.163448333740234,
+        "lat": 41.165359765291214,
+        "lon": -73.12639251351357,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBFI": {
+    "name": "Boeing/King Co Intl",
+    "lat": 47.529972195625305,
+    "lon": -122.30194464325905,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14L",
+        "headingTrueDeg": 150.28050231933594,
+        "lengthM": 1131.0662841796875,
+        "widthM": 31.108591079711914,
+        "lat": 47.533606588840485,
+        "lon": -122.3037426173687,
+        "identReciprocal": "32R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14R",
+        "headingTrueDeg": 150.2173614501953,
+        "lengthM": 3047.07763671875,
+        "widthM": 60.412689208984375,
+        "lat": 47.52864450216293,
+        "lon": -122.30129286646843,
+        "identReciprocal": "32L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBHB": {
+    "name": "Hancock County-Bar Harbor",
+    "lat": 44.449705593287945,
+    "lon": -68.36148887872696,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 24.506481170654297,
+        "lengthM": 1574.4144287109375,
+        "widthM": 27.693233489990234,
+        "lat": 44.45037882775068,
+        "lon": -68.363116979599,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 149.6163330078125,
+        "lengthM": 1021.1329345703125,
+        "widthM": 22.860000610351562,
+        "lat": 44.44874234497547,
+        "lon": -68.35891842842102,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCLL": {
+    "name": "Easterwood Field",
+    "lat": 30.588041692972183,
+    "lon": -96.36254444718361,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 108.79863739013672,
+        "lengthM": 1566.9312744140625,
+        "widthM": 45.720001220703125,
+        "lat": 30.589193031191826,
+        "lon": -96.36503264307976,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 168.90762329101562,
+        "lengthM": 2129.885498046875,
+        "widthM": 44.50080108642578,
+        "lat": 30.587179362773895,
+        "lon": -96.36070176959038,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 49.451717376708984,
+        "lengthM": 1569.634033203125,
+        "widthM": 45.720001220703125,
+        "lat": 30.589853525161743,
+        "lon": -96.36682525277138,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCOD": {
+    "name": "Yellowstone Rgnl",
+    "lat": 44.52019438147545,
+    "lon": -109.0238057076931,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 52.27653503417969,
+        "lengthM": 2521.11376953125,
+        "widthM": 27.377439498901367,
+        "lat": 44.52020913362503,
+        "lon": -109.02383387088776,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCRQ": {
+    "name": "Mc Clellan-Palomar",
+    "lat": 33.12824986875057,
+    "lon": -117.28008314967155,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 79.14282989501953,
+        "lengthM": 1490.48828125,
+        "widthM": 45.720001220703125,
+        "lat": 33.128258921206,
+        "lon": -117.28009343147278,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDVT": {
+    "name": "Phoenix Deer Valley",
+    "lat": 33.688305504620075,
+    "lon": -112.0825557410717,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7L",
+        "headingTrueDeg": 85.97482299804688,
+        "lengthM": 1371.6920166015625,
+        "widthM": 22.860000610351562,
+        "lat": 33.68959095329046,
+        "lon": -112.08207428455353,
+        "identReciprocal": "25R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7R",
+        "headingTrueDeg": 86.00362396240234,
+        "lengthM": 2497.671875,
+        "widthM": 30.48000144958496,
+        "lat": 33.68762522935867,
+        "lon": -112.08282798528671,
+        "identReciprocal": "25L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KELM": {
+    "name": "Elmira/Corning Rgnl",
+    "lat": 42.15985547751188,
+    "lon": -76.89174458384514,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 50.300750732421875,
+        "lengthM": 2438.91845703125,
+        "widthM": 45.720001220703125,
+        "lat": 42.1606246009469,
+        "lon": -76.89199000597,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10",
+        "headingTrueDeg": 89.22669219970703,
+        "lengthM": 1641.826171875,
+        "widthM": 45.720001220703125,
+        "lat": 42.15789310634136,
+        "lon": -76.89296141266823,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 50.22764587402344,
+        "lengthM": 615.7692260742188,
+        "widthM": 45.720001220703125,
+        "lat": 42.16212932020426,
+        "lon": -76.88749954104424,
+        "identReciprocal": "23",
+        "surface": "grass"
+      }
+    ]
+  },
+  "KFOE": {
+    "name": "Topeka Rgnl",
+    "lat": 38.950950130820274,
+    "lon": -95.66361397504807,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 137.20498657226562,
+        "lengthM": 3898.90625,
+        "widthM": 43.670570373535156,
+        "lat": 38.95271200686693,
+        "lon": -95.66272839903831,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 39.6884880065918,
+        "lengthM": 2132.683837890625,
+        "widthM": 45.720001220703125,
+        "lat": 38.94777104258537,
+        "lon": -95.66528052091599,
+        "identReciprocal": "21",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KGUC": {
+    "name": "Gunnison-Crested Butte Regl",
+    "lat": 38.53433333337307,
+    "lon": -106.9317501783371,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.81463623046875,
+        "lengthM": 834.15673828125,
+        "widthM": 45.720001220703125,
+        "lat": 38.52907855063677,
+        "lon": -106.93940877914429,
+        "identReciprocal": "35",
+        "surface": "grass"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 73.47040557861328,
+        "lengthM": 2864.832275390625,
+        "widthM": 42.07951354980469,
+        "lat": 38.53608515113592,
+        "lon": -106.92936971783638,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHDN": {
+    "name": "Yampa Valley",
+    "lat": 40.48119429498911,
+    "lon": -107.21766650676727,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 113.79328155517578,
+        "lengthM": 3038.27392578125,
+        "widthM": 39.61587905883789,
+        "lat": 40.48120267689228,
+        "lon": -107.21771970391273,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHVN": {
+    "name": "Tweed-New Haven",
+    "lat": 41.26374989748001,
+    "lon": -72.88680016994476,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 2.9061028957366943,
+        "lengthM": 1707.28369140625,
+        "widthM": 45.720001220703125,
+        "lat": 41.26373313367367,
+        "lon": -72.88773268461227,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 131.1681671142578,
+        "lengthM": 1104.9346923828125,
+        "widthM": 30,
+        "lat": 41.26379515975714,
+        "lon": -72.88536921143532,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHYA": {
+    "name": "Barnstable Muni-Boardman/Polan",
+    "lat": 41.66933611035347,
+    "lon": -70.28035819530487,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 49.80913543701172,
+        "lengthM": 1653.211181640625,
+        "widthM": 45.720001220703125,
+        "lat": 41.669408194720745,
+        "lon": -70.27519673109055,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 139.784912109375,
+        "lengthM": 1600.8861083984375,
+        "widthM": 42.671199798583984,
+        "lat": 41.66927274316549,
+        "lon": -70.28568550944328,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KIAG": {
+    "name": "Niagara Falls Intl",
+    "lat": 43.107558377087116,
+    "lon": -78.94584730267525,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 50.08944320678711,
+        "lengthM": 1712.872314453125,
+        "widthM": 45.43035125732422,
+        "lat": 43.10594402253628,
+        "lon": -78.9388458430767,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10",
+        "headingTrueDeg": 90.10051727294922,
+        "lengthM": 2993.15283203125,
+        "widthM": 42.46723556518555,
+        "lat": 43.109527453780174,
+        "lon": -78.95045444369316,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10R",
+        "headingTrueDeg": 90.15586853027344,
+        "lengthM": 1205.1153564453125,
+        "widthM": 22.951128005981445,
+        "lat": 43.10433369129896,
+        "lon": -78.94452854990959,
+        "identReciprocal": "28L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLGA": {
+    "name": "Laguardia",
+    "lat": 40.77725015580654,
+    "lon": -73.87261122465134,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 32.03467559814453,
+        "lengthM": 2133.819091796875,
+        "widthM": 44.79380798339844,
+        "lat": 40.777308493852615,
+        "lon": -73.8774025440216,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 122.23749542236328,
+        "lengthM": 2132.900634765625,
+        "widthM": 43.981510162353516,
+        "lat": 40.77719047665596,
+        "lon": -73.8678140938282,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLRD": {
+    "name": "Laredo Intl",
+    "lat": 27.54419445991516,
+    "lon": -99.46158349514008,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18L",
+        "headingTrueDeg": 182.55307006835938,
+        "lengthM": 2524.8251953125,
+        "widthM": 45.11110305786133,
+        "lat": 27.544982358813286,
+        "lon": -99.45991471409798,
+        "identReciprocal": "36R",
+        "surface": "concrete"
+      },
+      {
+        "ident": "18R",
+        "headingTrueDeg": 182.54563903808594,
+        "lengthM": 2663.504150390625,
+        "widthM": 44.68929672241211,
+        "lat": 27.544473074376583,
+        "lon": -99.46302875876427,
+        "identReciprocal": "36L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 147.4537353515625,
+        "lengthM": 1804.3568115234375,
+        "widthM": 45.27312088012695,
+        "lat": 27.542594857513905,
+        "lon": -99.46179762482643,
+        "identReciprocal": "32",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KMKC": {
+    "name": "Charles B Wheeler Downtown",
+    "lat": 39.12294443696737,
+    "lon": -94.59283322095871,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 38.399906158447266,
+        "lengthM": 1537.37060546875,
+        "widthM": 30.668046951293945,
+        "lat": 39.121727384626865,
+        "lon": -94.59299460053444,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 12.640823364257812,
+        "lengthM": 2081.42626953125,
+        "widthM": 45.65581130981445,
+        "lat": 39.12383794784546,
+        "lon": -94.59271162748337,
+        "identReciprocal": "19",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KMVY": {
+    "name": "Martha's Vineyard",
+    "lat": 41.39341659843922,
+    "lon": -70.61387479305267,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 220.53663635253906,
+        "lengthM": 1665.13330078125,
+        "widthM": 30.48000144958496,
+        "lat": 41.392395347356796,
+        "lon": -70.6128041446209,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "33",
+        "headingTrueDeg": 310.76312255859375,
+        "lengthM": 1000.4209594726562,
+        "widthM": 22.860000610351562,
+        "lat": 41.395127177238464,
+        "lon": -70.61564326286316,
+        "identReciprocal": "15",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KNEW": {
+    "name": "Lakefront",
+    "lat": 30.04241667687893,
+    "lon": -90.02824991941452,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 89.19416046142578,
+        "lengthM": 1005.9767456054688,
+        "widthM": 20.994491577148438,
+        "lat": 30.037119649350643,
+        "lon": -90.02571567893028,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18L",
+        "headingTrueDeg": 179.2726287841797,
+        "lengthM": 1125.4210205078125,
+        "widthM": 21.575971603393555,
+        "lat": 30.045108273625374,
+        "lon": -90.02760261297226,
+        "identReciprocal": "36R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18R",
+        "headingTrueDeg": 179.29176330566406,
+        "lengthM": 2095.380615234375,
+        "widthM": 43.443260192871094,
+        "lat": 30.043360143899918,
+        "lon": -90.02978727221489,
+        "identReciprocal": "36L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOGD": {
+    "name": "Ogden-Hinckley",
+    "lat": 41.1950695887208,
+    "lon": -112.0121942460537,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.78662109375,
+        "lengthM": 1576.4029541015625,
+        "widthM": 29.369043350219727,
+        "lat": 41.19378782808781,
+        "lon": -112.01495066285133,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 224.78756713867188,
+        "lengthM": 2465.541259765625,
+        "widthM": 41.845272064208984,
+        "lat": 41.19592756032944,
+        "lon": -112.01046645641327,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPGA": {
+    "name": "Page Muni",
+    "lat": 36.92606940865517,
+    "lon": -111.44835010170937,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 170.14813232421875,
+        "lengthM": 1813.408203125,
+        "widthM": 45.720001220703125,
+        "lat": 36.924774907529354,
+        "lon": -111.44782707095146,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 81.97748565673828,
+        "lengthM": 670.1058959960938,
+        "widthM": 23.96531105041504,
+        "lat": 36.92958075553179,
+        "lon": -111.44980251789093,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPGD": {
+    "name": "Punta Gorda",
+    "lat": 26.918591670691967,
+    "lon": -81.99088633060455,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 89.12689208984375,
+        "lengthM": 801.2249755859375,
+        "widthM": 18.288002014160156,
+        "lat": 26.923568174242973,
+        "lon": -81.99412643909454,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 149.304931640625,
+        "lengthM": 1733.4228515625,
+        "widthM": 45.720001220703125,
+        "lat": 26.91695351153612,
+        "lon": -81.99471652507782,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 29.043779373168945,
+        "lengthM": 2191.394287109375,
+        "widthM": 44.74134826660156,
+        "lat": 26.918824687600136,
+        "lon": -81.98677584528923,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSDL": {
+    "name": "Scottsdale",
+    "lat": 33.62288877367973,
+    "lon": -111.91052779555321,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 43.95094299316406,
+        "lengthM": 2514.913818359375,
+        "widthM": 29.886859893798828,
+        "lat": 33.62288240343332,
+        "lon": -111.91054657101631,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSEZ": {
+    "name": "Sedona",
+    "lat": 34.84858889132738,
+    "lon": -111.78844705224037,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 45.74578857421875,
+        "lengthM": 1558.4892578125,
+        "widthM": 29.42519760131836,
+        "lat": 34.848587885499,
+        "lon": -111.78844973444939,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSHR": {
+    "name": "Sheridan County",
+    "lat": 44.769194573163986,
+    "lon": -106.9802775979042,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 156.38658142089844,
+        "lengthM": 2527.9599609375,
+        "widthM": 29.6091251373291,
+        "lat": 44.76661395281553,
+        "lon": -106.98133662343025,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 67.93206024169922,
+        "lengthM": 1531.1451416015625,
+        "widthM": 21.172170639038086,
+        "lat": 44.77348040789366,
+        "lon": -106.9785426557064,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSNS": {
+    "name": "Salinas Muni",
+    "lat": 36.6627861186862,
+    "lon": -121.60636648535728,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 96.85843658447266,
+        "lengthM": 1830.0003662109375,
+        "widthM": 43.86790084838867,
+        "lat": 36.66194021701813,
+        "lon": -121.60839021205902,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 147.93235778808594,
+        "lengthM": 1471.2213134765625,
+        "widthM": 44.59347915649414,
+        "lat": 36.66300069540739,
+        "lon": -121.60563379526138,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSUN": {
+    "name": "Friedman Memorial",
+    "lat": 43.50378066301346,
+    "lon": -114.29555833339691,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 144.88677978515625,
+        "lengthM": 2300.445556640625,
+        "widthM": 31.10068702697754,
+        "lat": 43.503779992461205,
+        "lon": -114.29557576775551,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KTEB": {
+    "name": "Teterboro",
+    "lat": 40.85011102259159,
+    "lon": -74.06083345413208,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 183.189208984375,
+        "lengthM": 2134.91064453125,
+        "widthM": 43.92184829711914,
+        "lat": 40.84828343242407,
+        "lon": -74.05967205762863,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "24",
+        "headingTrueDeg": 228.2162628173828,
+        "lengthM": 1831.712646484375,
+        "widthM": 44.94865798950195,
+        "lat": 40.852237679064274,
+        "lon": -74.06220003962517,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KTEX": {
+    "name": "Telluride Regl",
+    "lat": 37.95380540192127,
+    "lon": -107.90875017642975,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 104.91915893554688,
+        "lengthM": 2166.0166015625,
+        "widthM": 32,
+        "lat": 37.95381747186184,
+        "lon": -107.90875107049942,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KTTN": {
+    "name": "Trenton Mercer",
+    "lat": 40.27669429779053,
+    "lon": -74.813472032547,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 46.490028381347656,
+        "lengthM": 1831.2547607421875,
+        "widthM": 45,
+        "lat": 40.27543198317289,
+        "lon": -74.81378898024559,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 145.65306091308594,
+        "lengthM": 1457.4151611328125,
+        "widthM": 42.4196891784668,
+        "lat": 40.27829624712467,
+        "lon": -74.81312781572342,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KUNV": {
+    "name": "University Park",
+    "lat": 40.8500000461936,
+    "lon": -77.8475832939148,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 52.604183197021484,
+        "lengthM": 2034.529541015625,
+        "widthM": 45.720001220703125,
+        "lat": 40.85003525018692,
+        "lon": -77.84756317734718,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KVNY": {
+    "name": "Van Nuys",
+    "lat": 34.20980539172888,
+    "lon": -118.48997220396996,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16L",
+        "headingTrueDeg": 175.54554748535156,
+        "lengthM": 1223.0023193359375,
+        "widthM": 22.860000610351562,
+        "lat": 34.213504157960415,
+        "lon": -118.48950371146202,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 175.52806091308594,
+        "lengthM": 2438.6142578125,
+        "widthM": 45.79050827026367,
+        "lat": 34.20795902609825,
+        "lon": -118.490219861269,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KABR": {
+    "name": "Aberdeen Rgnl",
+    "lat": 45.4467973485589,
+    "lon": -98.42244163155556,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.92730712890625,
+        "lengthM": 1668.8992919921875,
+        "widthM": 30.48000144958496,
+        "lat": 45.448044911026955,
+        "lon": -98.42736080288887,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.16477966308594,
+        "lengthM": 2100.23291015625,
+        "widthM": 30.48000144958496,
+        "lat": 45.448548160493374,
+        "lon": -98.4185653924942,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KABY": {
+    "name": "Southwest Georgia Rgnl",
+    "lat": 31.535527668893337,
+    "lon": -84.19447213411331,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 161.909912109375,
+        "lengthM": 1585.1138916015625,
+        "widthM": 45.11040115356445,
+        "lat": 31.53451446443796,
+        "lon": -84.19686108827591,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 41.96308135986328,
+        "lengthM": 2012.5252685546875,
+        "widthM": 45.11040115356445,
+        "lat": 31.536334678530693,
+        "lon": -84.19263482093811,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KAIA": {
+    "name": "Alliance Mun",
+    "lat": 42.05322224646807,
+    "lon": -102.80375003814697,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 134.41307067871094,
+        "lengthM": 2797.413818359375,
+        "widthM": 43.60558319091797,
+        "lat": 42.05116465687752,
+        "lon": -102.80645951628685,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.34408569335938,
+        "lengthM": 1921.8719482421875,
+        "widthM": 22.860000610351562,
+        "lat": 42.05076165497303,
+        "lon": -102.79498189687729,
+        "identReciprocal": "35",
+        "surface": "concrete"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.2996826171875,
+        "lengthM": 1888.037841796875,
+        "widthM": 22.860000610351562,
+        "lat": 42.058780789375305,
+        "lon": -102.808738052845,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KALO": {
+    "name": "Waterloo Rgnl",
+    "lat": 42.55844984203577,
+    "lon": -92.40102231502533,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 307.860595703125,
+        "lengthM": 2558.07275390625,
+        "widthM": 45.720001220703125,
+        "lat": 42.55898158997297,
+        "lon": -92.39964231848717,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "36",
+        "headingTrueDeg": 7.7340192794799805,
+        "lengthM": 1816.369140625,
+        "widthM": 44.19441604614258,
+        "lat": 42.557724975049496,
+        "lon": -92.40298837423325,
+        "identReciprocal": "18",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 67.66271209716797,
+        "lengthM": 1633.51953125,
+        "widthM": 36.7623176574707,
+        "lat": 42.55344618111849,
+        "lon": -92.39850863814354,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KALS": {
+    "name": "San Luis Valley Rgnl/Bergman F",
+    "lat": 37.43512485176325,
+    "lon": -105.86787521839142,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 31.651174545288086,
+        "lengthM": 2590.5888671875,
+        "widthM": 30.48000144958496,
+        "lat": 37.43514496833086,
+        "lon": -105.8678725361824,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 118.41895294189453,
+        "lengthM": 2089.384521484375,
+        "widthM": 25,
+        "lat": 37.435308918356895,
+        "lon": -105.8608826994896,
+        "identReciprocal": "29",
+        "surface": "dirt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 76.55181884765625,
+        "lengthM": 1509.2421875,
+        "widthM": 25,
+        "lat": 37.4337874352932,
+        "lon": -105.86603879928589,
+        "identReciprocal": "25",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "KAOO": {
+    "name": "Altoona-Blair County",
+    "lat": 40.2963612601161,
+    "lon": -78.32002758979797,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 108.4448013305664,
+        "lengthM": 1117.7760009765625,
+        "widthM": 22.860000610351562,
+        "lat": 40.297011360526085,
+        "lon": -78.31942051649094,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 15.850495338439941,
+        "lengthM": 1655.85400390625,
+        "widthM": 28.998432159423828,
+        "lat": 40.29593713581562,
+        "lon": -78.32043752074242,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KAPN": {
+    "name": "Alpena County Rgnl",
+    "lat": 45.07808346301317,
+    "lon": -83.56030538678169,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 59.7086067199707,
+        "lengthM": 1531.919921875,
+        "widthM": 29.78853988647461,
+        "lat": 45.07951408624649,
+        "lon": -83.5583022236824,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 359.7993469238281,
+        "lengthM": 2736.62158203125,
+        "widthM": 45.07164764404297,
+        "lat": 45.077294893562794,
+        "lon": -83.56143906712532,
+        "identReciprocal": "19",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KART": {
+    "name": "Watertown Intl",
+    "lat": 43.99183340370655,
+    "lon": -76.01941645145416,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 92.91521453857422,
+        "lengthM": 2130.646484375,
+        "widthM": 44.20719909667969,
+        "lat": 43.99177707731724,
+        "lon": -76.01737439632416,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 53.34825897216797,
+        "lengthM": 1511.688720703125,
+        "widthM": 44.42809295654297,
+        "lat": 43.99193365126848,
+        "lon": -76.02232351899147,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KATY": {
+    "name": "Watertown Rgnl",
+    "lat": 44.91397216916084,
+    "lon": -97.15472236275673,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.2507781982422,
+        "lengthM": 2096.0498046875,
+        "widthM": 30.48000144958496,
+        "lat": 44.91112366318703,
+        "lon": -97.1511322259903,
+        "identReciprocal": "35",
+        "surface": "concrete"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 124.60717010498047,
+        "lengthM": 2102.27783203125,
+        "widthM": 30.48000144958496,
+        "lat": 44.9168511852622,
+        "lon": -97.15835988521576,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KAUG": {
+    "name": "Augusta State",
+    "lat": 44.32065010070801,
+    "lon": -69.7973196208477,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 333.09857177734375,
+        "lengthM": 1522.68212890625,
+        "widthM": 28.537845611572266,
+        "lat": 44.321538247168064,
+        "lon": -69.79939118027687,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 61.78078842163086,
+        "lengthM": 813.1744995117188,
+        "widthM": 19.213909149169922,
+        "lat": 44.319006241858006,
+        "lon": -69.79356229305267,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KAWO": {
+    "name": "Arlington Mun",
+    "lat": 48.16074997186661,
+    "lon": -122.15902760624886,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 179.1665496826172,
+        "lengthM": 1624.310791015625,
+        "widthM": 30.48000144958496,
+        "lat": 48.162042796611786,
+        "lon": -122.15637534856796,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 127.2580337524414,
+        "lengthM": 1102.3153076171875,
+        "widthM": 21.50446891784668,
+        "lat": 48.15879799425602,
+        "lon": -122.16313183307648,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBBG": {
+    "name": "Branson",
+    "lat": 36.53208341449499,
+    "lon": -93.20054456591606,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 144.96630859375,
+        "lengthM": 2187.458251953125,
+        "widthM": 45.720001220703125,
+        "lat": 36.53209012001753,
+        "lon": -93.20050075650215,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBED": {
+    "name": "Laurence G Hanscom Fld",
+    "lat": 42.469944320619106,
+    "lon": -71.28900021314621,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 36.926631927490234,
+        "lengthM": 1556.735107421875,
+        "widthM": 42.5819206237793,
+        "lat": 42.46902398765087,
+        "lon": -71.2911593914032,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "29",
+        "headingTrueDeg": 277.1534729003906,
+        "lengthM": 2134.348876953125,
+        "widthM": 43.110595703125,
+        "lat": 42.470641024410725,
+        "lon": -71.28745704889297,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBFD": {
+    "name": "Bradford Rgnl",
+    "lat": 41.80295571684837,
+    "lon": -78.63996684551239,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 133.98226928710938,
+        "lengthM": 1919.6224365234375,
+        "widthM": 45.720001220703125,
+        "lat": 41.8033392727375,
+        "lon": -78.64048629999161,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 43.735809326171875,
+        "lengthM": 1367.8533935546875,
+        "widthM": 30.48000144958496,
+        "lat": 41.80244643241167,
+        "lon": -78.63926857709885,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBFF": {
+    "name": "Western Nebraska Rgnl/William",
+    "lat": 41.874027885496616,
+    "lon": -103.59563872218132,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 68.0197982788086,
+        "lengthM": 2426.282470703125,
+        "widthM": 25,
+        "lat": 41.87388237565756,
+        "lon": -103.59701871871948,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "30",
+        "headingTrueDeg": 315.7080993652344,
+        "lengthM": 2512.6533203125,
+        "widthM": 25,
+        "lat": 41.87417674809694,
+        "lon": -103.59432265162468,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBJC": {
+    "name": "Rocky Mountain Metropolitan",
+    "lat": 39.908805526793,
+    "lon": -105.11719465255737,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 34.29057693481445,
+        "lengthM": 1097.3668212890625,
+        "widthM": 23.157733917236328,
+        "lat": 39.90996591746807,
+        "lon": -105.1144677400589,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12L",
+        "headingTrueDeg": 124.31131744384766,
+        "lengthM": 2740.8330078125,
+        "widthM": 30.48000144958496,
+        "lat": 39.908349215984344,
+        "lon": -105.11518836021423,
+        "identReciprocal": "30R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12R",
+        "headingTrueDeg": 124.29682159423828,
+        "lengthM": 2132.13037109375,
+        "widthM": 23.271337509155273,
+        "lat": 39.90879915654659,
+        "lon": -105.12126043438911,
+        "identReciprocal": "30L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBKW": {
+    "name": "Raleigh County Memorial",
+    "lat": 37.78733342885971,
+    "lon": -81.12416669726372,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 97.48380279541016,
+        "lengthM": 1513.975341796875,
+        "widthM": 30.48000144958496,
+        "lat": 37.782021313905716,
+        "lon": -81.12403929233551,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 7.334822654724121,
+        "lengthM": 2049.665283203125,
+        "widthM": 43.787689208984375,
+        "lat": 37.79126890003681,
+        "lon": -81.12426370382309,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBLV": {
+    "name": "Scott Afb/Midamerica",
+    "lat": 38.54517214000225,
+    "lon": -89.8351863026619,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14R",
+        "headingTrueDeg": 136.7030029296875,
+        "lengthM": 2442.17431640625,
+        "widthM": 42.532474517822266,
+        "lat": 38.543843775987625,
+        "lon": -89.85229790210724,
+        "identReciprocal": "32L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14L",
+        "headingTrueDeg": 136.70506286621094,
+        "lengthM": 3046.1650390625,
+        "widthM": 39.48221206665039,
+        "lat": 38.546239994466305,
+        "lon": -89.82148289680481,
+        "identReciprocal": "32R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBQK": {
+    "name": "Brunswick Golden Isles",
+    "lat": 31.259033493697643,
+    "lon": -81.46631687879562,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 65.21977233886719,
+        "lengthM": 2437.940185546875,
+        "widthM": 45.720001220703125,
+        "lat": 31.259052269160748,
+        "lon": -81.46632134914398,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KBRD": {
+    "name": "Brainerd Lakes Rgnl",
+    "lat": 46.40422224998474,
+    "lon": -94.13380533456802,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 162.66702270507812,
+        "lengthM": 2160.42626953125,
+        "widthM": 43.03114318847656,
+        "lat": 46.40816643834114,
+        "lon": -94.1318692266941,
+        "identReciprocal": "34",
+        "surface": "concrete"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 53.39523696899414,
+        "lengthM": 1983.861328125,
+        "widthM": 41.38484573364258,
+        "lat": 46.39995217323303,
+        "lon": -94.13595467805862,
+        "identReciprocal": "23",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KBRL": {
+    "name": "Southeast Iowa Rgnl",
+    "lat": 40.78297231346369,
+    "lon": -91.1255832016468,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.5756378173828,
+        "lengthM": 2035.6502685546875,
+        "widthM": 44.7976188659668,
+        "lat": 40.779613852500916,
+        "lon": -91.12385585904121,
+        "identReciprocal": "36",
+        "surface": "concrete"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 119.61090850830078,
+        "lengthM": 1629.632568359375,
+        "widthM": 28.379383087158203,
+        "lat": 40.78779023140669,
+        "lon": -91.12759932875633,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCDR": {
+    "name": "Chadron Muni",
+    "lat": 42.83755850046873,
+    "lon": -103.09540271759033,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 125.01551818847656,
+        "lengthM": 1343.17578125,
+        "widthM": 22.860000610351562,
+        "lat": 42.83462651073933,
+        "lon": -103.09745907783508,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 34.99033737182617,
+        "lengthM": 1828.61962890625,
+        "widthM": 29.471572875976562,
+        "lat": 42.83972706645727,
+        "lon": -103.09391275048256,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCEC": {
+    "name": "Jack Mc Namara Field",
+    "lat": 41.780166663229465,
+    "lon": -124.23652768135071,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 133.28294372558594,
+        "lengthM": 1531.3134765625,
+        "widthM": 44.15425109863281,
+        "lat": 41.78031753748655,
+        "lon": -124.23490852117538,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 193.14268493652344,
+        "lengthM": 1525.9664306640625,
+        "widthM": 45.720001220703125,
+        "lat": 41.78004965186119,
+        "lon": -124.23821613192558,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCEZ": {
+    "name": "Cortez Mun",
+    "lat": 37.303002923727036,
+    "lon": -108.62804442644119,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 41.424171447753906,
+        "lengthM": 2181.966064453125,
+        "widthM": 30.48000144958496,
+        "lat": 37.303018681705,
+        "lon": -108.62805962562561,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCGI": {
+    "name": "Cape Girardeau Rgnl",
+    "lat": 37.22530569881201,
+    "lon": -89.57074999809265,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 105.84065246582031,
+        "lengthM": 1979.52734375,
+        "widthM": 42.23032760620117,
+        "lat": 37.22494427114725,
+        "lon": -89.57100883126259,
+        "identReciprocal": "28",
+        "surface": "concrete"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 21.1019229888916,
+        "lengthM": 1217.609375,
+        "widthM": 30.48000144958496,
+        "lat": 37.225922271609306,
+        "lon": -89.57035347819328,
+        "identReciprocal": "20",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KCIU": {
+    "name": "Chippewa County Intl",
+    "lat": 46.250752620399,
+    "lon": -84.47238340973854,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 89.95645904541016,
+        "lengthM": 1524.3050537109375,
+        "widthM": 22.860000610351562,
+        "lat": 46.25501062721014,
+        "lon": -84.47442054748535,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 149.9821319580078,
+        "lengthM": 2195.47412109375,
+        "widthM": 45.720001220703125,
+        "lat": 46.24781157821417,
+        "lon": -84.4709886610508,
+        "identReciprocal": "34",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KCMX": {
+    "name": "Houghton County Memorial",
+    "lat": 47.168416790664196,
+    "lon": -88.48906114697456,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 131.0376434326172,
+        "lengthM": 1979.27392578125,
+        "widthM": 42.65498352050781,
+        "lat": 47.16948866844177,
+        "lon": -88.48899409174919,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 66.82899475097656,
+        "lengthM": 1580.513427734375,
+        "widthM": 28.230342864990234,
+        "lat": 47.16708205640316,
+        "lon": -88.48918944597244,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCNM": {
+    "name": "Cavern City Air Trml",
+    "lat": 32.337444461882114,
+    "lon": -104.26336124539375,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "26",
+        "headingTrueDeg": 269.99249267578125,
+        "lengthM": 1570.6861572265625,
+        "widthM": 21.242265701293945,
+        "lat": 32.342300936579704,
+        "lon": -104.26147788763046,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14L",
+        "headingTrueDeg": 156.3060760498047,
+        "lengthM": 1404.7767333984375,
+        "widthM": 43.883155822753906,
+        "lat": 32.34605971723795,
+        "lon": -104.25707772374153,
+        "identReciprocal": "32R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14R",
+        "headingTrueDeg": 154.17410278320312,
+        "lengthM": 1775.630126953125,
+        "widthM": 30.48000144958496,
+        "lat": 32.33568459749222,
+        "lon": -104.26672652363777,
+        "identReciprocal": "32L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 43.978912353515625,
+        "lengthM": 2391.808837890625,
+        "widthM": 45.720001220703125,
+        "lat": 32.3303996399045,
+        "lon": -104.2654176056385,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCNY": {
+    "name": "Canyonlands",
+    "lat": 38.757630586624146,
+    "lon": -109.75346401333809,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 39.88555145263672,
+        "lengthM": 2241.051025390625,
+        "widthM": 30,
+        "lat": 38.754698261618614,
+        "lon": -109.75514620542526,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 157.35494995117188,
+        "lengthM": 692.0902709960938,
+        "widthM": 20,
+        "lat": 38.76792322844267,
+        "lon": -109.74770039319992,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KCVN": {
+    "name": "Clovis Mun",
+    "lat": 34.42658890038729,
+    "lon": -103.07758033275604,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 130.59783935546875,
+        "lengthM": 1720.51123046875,
+        "widthM": 45.720001220703125,
+        "lat": 34.42653391510248,
+        "lon": -103.07829961180687,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 45.56209945678711,
+        "lengthM": 2191.5048828125,
+        "widthM": 45.720001220703125,
+        "lat": 34.42901764065027,
+        "lon": -103.075682669878,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDBQ": {
+    "name": "Dubuque Rgnl",
+    "lat": 42.401999942958355,
+    "lon": -90.70947200059891,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 180.02398681640625,
+        "lengthM": 1915.077392578125,
+        "widthM": 42.46539306640625,
+        "lat": 42.40094851702452,
+        "lon": -90.7121054828167,
+        "identReciprocal": "36",
+        "surface": "concrete"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.09588623046875,
+        "lengthM": 1977.5147705078125,
+        "widthM": 30.48000144958496,
+        "lat": 42.40299940109253,
+        "lon": -90.70698514580727,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KDDC": {
+    "name": "Dodge City Rgnl",
+    "lat": 37.76311106979847,
+    "lon": -99.96541678905487,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 153.9019775390625,
+        "lengthM": 2101.6220703125,
+        "widthM": 25.75528907775879,
+        "lat": 37.764672450721264,
+        "lon": -99.96677622199059,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 32.14748764038086,
+        "lengthM": 1405.3865966796875,
+        "widthM": 25.886760711669922,
+        "lat": 37.76086036115885,
+        "lon": -99.9634337425232,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDEC": {
+    "name": "Decatur",
+    "lat": 39.83456399291754,
+    "lon": -88.86568889021873,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 59.006591796875,
+        "lengthM": 2589.718017578125,
+        "widthM": 43.79704666137695,
+        "lat": 39.833090119063854,
+        "lon": -88.8615457713604,
+        "identReciprocal": "24",
+        "surface": "concrete"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 119.19800567626953,
+        "lengthM": 2002.8863525390625,
+        "widthM": 43.30435562133789,
+        "lat": 39.83656693249941,
+        "lon": -88.86388778686523,
+        "identReciprocal": "30",
+        "surface": "concrete"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.1269989013672,
+        "lengthM": 1544.7783203125,
+        "widthM": 43.169227600097656,
+        "lat": 39.834492579102516,
+        "lon": -88.87424826622009,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDHN": {
+    "name": "Dothan Rgnl",
+    "lat": 31.321027725934982,
+    "lon": -85.44947236776352,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.9505615234375,
+        "lengthM": 1670.795654296875,
+        "widthM": 27.68240737915039,
+        "lat": 31.319003328680992,
+        "lon": -85.44556125998497,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 135.10122680664062,
+        "lengthM": 2579.662109375,
+        "widthM": 44.18827438354492,
+        "lat": 31.32233865559101,
+        "lon": -85.45201823115349,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDOV": {
+    "name": "Dover Afb",
+    "lat": 39.12953898310661,
+    "lon": -75.46596094965935,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 3.171715021133423,
+        "lengthM": 2923.649169921875,
+        "widthM": 45.720001220703125,
+        "lat": 39.130373150110245,
+        "lon": -75.46364843845367,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 125.8822250366211,
+        "lengthM": 3934.92138671875,
+        "widthM": 45.720001220703125,
+        "lat": 39.12893649190664,
+        "lon": -75.46764984726906,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDTS": {
+    "name": "Destin-Ft Walton Beach",
+    "lat": 30.40005572140217,
+    "lon": -86.47147223353386,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 142.15997314453125,
+        "lengthM": 1518.470947265625,
+        "widthM": 31.36244010925293,
+        "lat": 30.4000523686409,
+        "lon": -86.47146597504616,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDUJ": {
+    "name": "Dubois Rgnl",
+    "lat": 41.17827761918306,
+    "lon": -78.89869451522827,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 62.346073150634766,
+        "lengthM": 1682.0682373046875,
+        "widthM": 28.806520462036133,
+        "lat": 41.17827359586954,
+        "lon": -78.89871418476105,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KDVL": {
+    "name": "Devils Lake Mun",
+    "lat": 48.11658337712288,
+    "lon": -98.91000017523766,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "31",
+        "headingTrueDeg": 318.1650695800781,
+        "lengthM": 1937.9476318359375,
+        "widthM": 27.046125411987305,
+        "lat": 48.11762072145939,
+        "lon": -98.91102835536003,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 44.94843673706055,
+        "lengthM": 1301.73681640625,
+        "widthM": 20.460493087768555,
+        "lat": 48.115089386701584,
+        "lon": -98.90850350260735,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KEAR": {
+    "name": "Kearney Mun",
+    "lat": 40.72704154998064,
+    "lon": -99.00676935911179,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 187.38572692871094,
+        "lengthM": 2161.555419921875,
+        "widthM": 45.31412124633789,
+        "lat": 40.72674483060837,
+        "lon": -99.00876045227051,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 141.337158203125,
+        "lengthM": 1369.45361328125,
+        "widthM": 21.764835357666016,
+        "lat": 40.727506913244724,
+        "lon": -99.00366693735123,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KEAU": {
+    "name": "Chippewa Valley Rgnl",
+    "lat": 44.86580539494753,
+    "lon": -91.48424997925758,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.971214294433594,
+        "lengthM": 2469.18505859375,
+        "widthM": 45.720001220703125,
+        "lat": 44.86715320497751,
+        "lon": -91.48168936371803,
+        "identReciprocal": "22",
+        "surface": "concrete"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 138.96507263183594,
+        "lengthM": 1523.9569091796875,
+        "widthM": 30.479999542236328,
+        "lat": 44.863636158406734,
+        "lon": -91.48844808340073,
+        "identReciprocal": "32",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KEDC": {
+    "name": "Bird's Nest",
+    "lat": 30.397494547069073,
+    "lon": -97.56639450788498,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 166.0681915283203,
+        "lengthM": 488.263916015625,
+        "widthM": 7.62000036239624,
+        "lat": 30.395160354673862,
+        "lon": -97.56682232022285,
+        "identReciprocal": "34",
+        "surface": "concrete"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 131.57257080078125,
+        "lengthM": 1835.66943359375,
+        "widthM": 30.48000144958496,
+        "lat": 30.398134253919125,
+        "lon": -97.56630018353462,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KELD": {
+    "name": "South Arkansas Rgnl At Goodwin",
+    "lat": 33.221239037811756,
+    "lon": -92.8117498755455,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 136.08580017089844,
+        "lengthM": 1550.3890380859375,
+        "widthM": 30.48000144958496,
+        "lat": 33.22252582758665,
+        "lon": -92.81271010637283,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 45.80400085449219,
+        "lengthM": 2012.310791015625,
+        "widthM": 42.31448745727539,
+        "lat": 33.22025801986456,
+        "lon": -92.81101360917091,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KESC": {
+    "name": "Delta Co",
+    "lat": 45.7226749509573,
+    "lon": -87.09371656179428,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 0.878437876701355,
+        "lengthM": 1520.1729736328125,
+        "widthM": 30.321657180786133,
+        "lat": 45.72525758296251,
+        "lon": -87.08655372262001,
+        "identReciprocal": "19",
+        "surface": "concrete"
+      },
+      {
+        "ident": "28",
+        "headingTrueDeg": 270.9814758300781,
+        "lengthM": 1980.0601806640625,
+        "widthM": 45.814231872558594,
+        "lat": 45.72070822119713,
+        "lon": -87.0991887152195,
+        "identReciprocal": "10",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KEWB": {
+    "name": "New Bedford Rgnl",
+    "lat": 41.67656667530537,
+    "lon": -70.95783591270447,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 128.61912536621094,
+        "lengthM": 1520.1162109375,
+        "widthM": 40.67192840576172,
+        "lat": 41.6760416328907,
+        "lon": -70.9567791223526,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 38.31453323364258,
+        "lengthM": 1642.763427734375,
+        "widthM": 45.720001220703125,
+        "lat": 41.67707160115242,
+        "lon": -70.95883458852768,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KFHR": {
+    "name": "Friday Harbor",
+    "lat": 48.521972112357616,
+    "lon": -123.02436098456383,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 177,
+        "lengthM": 1037.757568359375,
+        "widthM": 23,
+        "lat": 48.521961718797684,
+        "lon": -123.02438244223595,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KFOD": {
+    "name": "Fort Dodge Rgnl",
+    "lat": 42.551194466650486,
+    "lon": -94.19183313846588,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 127.05828094482422,
+        "lengthM": 1612.7508544921875,
+        "widthM": 30.48000144958496,
+        "lat": 42.5509312748909,
+        "lon": -94.18828591704369,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 64.89456939697266,
+        "lengthM": 1994.51513671875,
+        "widthM": 44.68473434448242,
+        "lat": 42.55143754184246,
+        "lon": -94.19474959373474,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KFTW": {
+    "name": "Fort Worth Meacham Intl",
+    "lat": 32.819769345223904,
+    "lon": -97.36245006322861,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 171.89930725097656,
+        "lengthM": 2282.71337890625,
+        "widthM": 44.76755905151367,
+        "lat": 32.8199752047658,
+        "lon": -97.36077412962914,
+        "identReciprocal": "34",
+        "surface": "concrete"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 171.90286254882812,
+        "lengthM": 1218.26171875,
+        "widthM": 23,
+        "lat": 32.819395177066326,
+        "lon": -97.36561015248299,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "27",
+        "headingTrueDeg": 279.8850402832031,
+        "lengthM": 1117.00439453125,
+        "widthM": 29.90696907043457,
+        "lat": 32.817947790026665,
+        "lon": -97.35931366682053,
+        "identReciprocal": "9",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KGCC": {
+    "name": "Gillette-Campbell County",
+    "lat": 44.34890817850828,
+    "lon": -105.53936675190926,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 169.64488220214844,
+        "lengthM": 2286.79541015625,
+        "widthM": 43.53597640991211,
+        "lat": 44.34691295027733,
+        "lon": -105.54135471582413,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 38.244728088378906,
+        "lengthM": 1770.0828857421875,
+        "widthM": 22.860000610351562,
+        "lat": 44.35149550437927,
+        "lon": -105.5368521809578,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGCK": {
+    "name": "Garden City Rgnl",
+    "lat": 37.92752780020237,
+    "lon": -100.72441667318344,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.41127014160156,
+        "lengthM": 2224.260986328125,
+        "widthM": 28.53514289855957,
+        "lat": 37.929235361516476,
+        "lon": -100.72291642427444,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 135.53189086914062,
+        "lengthM": 1737.9044189453125,
+        "widthM": 30.48000144958496,
+        "lat": 37.92532369494438,
+        "lon": -100.72635143995285,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGCN": {
+    "name": "Grand Canyon National Park",
+    "lat": 35.95236115157604,
+    "lon": -112.1469721198082,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 220.66517639160156,
+        "lengthM": 2743.62109375,
+        "widthM": 45.51597595214844,
+        "lat": 35.95235612243414,
+        "lon": -112.14696809649467,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGDV": {
+    "name": "Dawson Community",
+    "lat": 47.13872205466032,
+    "lon": -104.80722203850746,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 136.47962951660156,
+        "lengthM": 1737.78271484375,
+        "widthM": 27.204626083374023,
+        "lat": 47.13774371892214,
+        "lon": -104.80560019612312,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 36.20687484741211,
+        "lengthM": 914.15966796875,
+        "widthM": 18.288002014160156,
+        "lat": 47.140595242381096,
+        "lon": -104.81014654040337,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGGW": {
+    "name": "Wokal Field/Glasgow Intl",
+    "lat": 48.21244452148676,
+    "lon": -106.61480560898781,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 133.9728546142578,
+        "lengthM": 1581.978759765625,
+        "widthM": 30.48000144958496,
+        "lat": 48.21227956563234,
+        "lon": -106.61543995141983,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.89405059814453,
+        "lengthM": 1591.4097900390625,
+        "widthM": 20.097902297973633,
+        "lat": 48.21283981204033,
+        "lon": -106.61493346095085,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGLH": {
+    "name": "Greenville Mid-Delta",
+    "lat": 33.48288048058748,
+    "lon": -90.98561391234398,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18R",
+        "headingTrueDeg": 180.0291290283203,
+        "lengthM": 2136.576904296875,
+        "widthM": 43.564517974853516,
+        "lat": 33.48453473299742,
+        "lon": -90.98722279071808,
+        "identReciprocal": "36L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "18L",
+        "headingTrueDeg": 180,
+        "lengthM": 2438.548095703125,
+        "widthM": 44.56300735473633,
+        "lat": 33.48590534180403,
+        "lon": -90.98209351301193,
+        "identReciprocal": "36R",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KGRI": {
+    "name": "Central Nebraska Rgnl",
+    "lat": 40.96754182130098,
+    "lon": -98.30963909626007,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.33700561523438,
+        "lengthM": 2130.890869140625,
+        "widthM": 40.884490966796875,
+        "lat": 40.96757434308529,
+        "lon": -98.3148542046547,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.40609741210938,
+        "lengthM": 2011.0008544921875,
+        "widthM": 26.67571449279785,
+        "lat": 40.97194768488407,
+        "lon": -98.30334797501564,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGTR": {
+    "name": "Golden Triangle Rgnl",
+    "lat": 33.44827763736248,
+    "lon": -88.59138876199722,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 180.48570251464844,
+        "lengthM": 2437.158203125,
+        "widthM": 41.8744010925293,
+        "lat": 33.44827093183994,
+        "lon": -88.59141692519188,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGUP": {
+    "name": "Gallup Muni",
+    "lat": 35.51105830818415,
+    "lon": -108.78930822014809,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 73.81646728515625,
+        "lengthM": 2228.38720703125,
+        "widthM": 30.343711853027344,
+        "lat": 35.51106434315443,
+        "lon": -108.78931358456612,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KGYY": {
+    "name": "Gary/Chicago Intl",
+    "lat": 41.617249958217144,
+    "lon": -87.41452798247337,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 21.19630241394043,
+        "lengthM": 1099.0035400390625,
+        "widthM": 30.48000144958496,
+        "lat": 41.616899594664574,
+        "lon": -87.41604745388031,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 124.19641876220703,
+        "lengthM": 2720.143310546875,
+        "widthM": 45.720001220703125,
+        "lat": 41.61744508892298,
+        "lon": -87.41404294967651,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHHR": {
+    "name": "Jack Northrop Field/Hawthorne",
+    "lat": 33.922860994935036,
+    "lon": -118.33508312702179,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 86.7425308227539,
+        "lengthM": 1490.4599609375,
+        "widthM": 30.55783462524414,
+        "lat": 33.922849260270596,
+        "lon": -118.3351032435894,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHIB": {
+    "name": "Range Rgnl",
+    "lat": 47.38657493144274,
+    "lon": -92.83897787332535,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 132.31039428710938,
+        "lengthM": 2056.818359375,
+        "widthM": 43.380096435546875,
+        "lat": 47.38544940948486,
+        "lon": -92.83768773078918,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 49.29828643798828,
+        "lengthM": 934.4410400390625,
+        "widthM": 21.304309844970703,
+        "lat": 47.38908112049103,
+        "lon": -92.84188762307167,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHII": {
+    "name": "Lake Havasu City",
+    "lat": 34.5711250975728,
+    "lon": -114.35827776789665,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 149.7416229248047,
+        "lengthM": 2436.149169921875,
+        "widthM": 30.057056427001953,
+        "lat": 34.57112677395344,
+        "lon": -114.35828357934952,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHOB": {
+    "name": "Lea County Rgnl",
+    "lat": 32.68749989569187,
+    "lon": -103.21733325719833,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.3677978515625,
+        "lengthM": 1829.0870361328125,
+        "widthM": 42.25912094116211,
+        "lat": 32.68807657063007,
+        "lon": -103.21443557739258,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.10769653320312,
+        "lengthM": 1522.9541015625,
+        "widthM": 30.48000144958496,
+        "lat": 32.6892875880003,
+        "lon": -103.22085589170456,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.827293395996094,
+        "lengthM": 2254.448974609375,
+        "widthM": 42.344268798828125,
+        "lat": 32.68586676567793,
+        "lon": -103.21736946702003,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHOT": {
+    "name": "Memorial Field",
+    "lat": 34.47802763432264,
+    "lon": -93.096222281456,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 134.52081298828125,
+        "lengthM": 1248.9500732421875,
+        "widthM": 30.48000144958496,
+        "lat": 34.47757299989462,
+        "lon": -93.09441581368446,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 54.14411926269531,
+        "lengthM": 2005.9117431640625,
+        "widthM": 43.441890716552734,
+        "lat": 34.47833005338907,
+        "lon": -93.0973707139492,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHRO": {
+    "name": "Boone County",
+    "lat": 36.261519603431225,
+    "lon": -93.15472796559334,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 185.6599884033203,
+        "lengthM": 1877.249267578125,
+        "widthM": 45.867740631103516,
+        "lat": 36.26152630895376,
+        "lon": -93.15475568175316,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHVR": {
+    "name": "Havre City-County",
+    "lat": 48.54298621416092,
+    "lon": -109.76234167814255,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 90.08335876464844,
+        "lengthM": 1580.8740234375,
+        "widthM": 25.9798641204834,
+        "lat": 48.544053733348846,
+        "lon": -109.7620202600956,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 45.029266357421875,
+        "lengthM": 1118.3309326171875,
+        "widthM": 16.46083641052246,
+        "lat": 48.54152876883745,
+        "lon": -109.76280614733696,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHXD": {
+    "name": "Hilton Head",
+    "lat": 32.2244942933321,
+    "lon": -80.69739997386932,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 26.09724235534668,
+        "lengthM": 1523.7601318359375,
+        "widthM": 29.573081970214844,
+        "lat": 32.22449999302626,
+        "lon": -80.69740757346153,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KHYS": {
+    "name": "Hays Rgnl",
+    "lat": 38.84222209453583,
+    "lon": -99.27316680550575,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 167.41673278808594,
+        "lengthM": 1979.9476318359375,
+        "widthM": 28.442943572998047,
+        "lat": 38.84413216263056,
+        "lon": -99.27381858229637,
+        "identReciprocal": "34",
+        "surface": "concrete"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 47.99062728881836,
+        "lengthM": 1371.5863037109375,
+        "widthM": 22.14571189880371,
+        "lat": 38.83943561464548,
+        "lon": -99.27226513624191,
+        "identReciprocal": "22",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KIMT": {
+    "name": "Ford",
+    "lat": 45.81836108118296,
+    "lon": -88.11455547809601,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 132.09495544433594,
+        "lengthM": 1146.7080078125,
+        "widthM": 20.386899948120117,
+        "lat": 45.81666927784681,
+        "lon": -88.1164513528347,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 7.7093377113342285,
+        "lengthM": 1970.3095703125,
+        "widthM": 41.7086181640625,
+        "lat": 45.819325000047684,
+        "lon": -88.11343610286713,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KINL": {
+    "name": "Falls Intl-Einarson Field",
+    "lat": 48.56558885425329,
+    "lon": -93.40218052268028,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.9710235595703,
+        "lengthM": 2257.1220703125,
+        "widthM": 40.985652923583984,
+        "lat": 48.56555934995413,
+        "lon": -93.40205267071724,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 41.95217514038086,
+        "lengthM": 903.08251953125,
+        "widthM": 22.028827667236328,
+        "lat": 48.56566596776247,
+        "lon": -93.40259984135628,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KIPL": {
+    "name": "Imperial County",
+    "lat": 32.834222093224525,
+    "lon": -115.57874992489815,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 152.76873779296875,
+        "lengthM": 1616.46533203125,
+        "widthM": 29.14995574951172,
+        "lat": 32.83603426069021,
+        "lon": -115.57534843683243,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.94391632080078,
+        "lengthM": 1369.3653564453125,
+        "widthM": 20.936054229736328,
+        "lat": 32.83211722970009,
+        "lon": -115.58280229568481,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KIPT": {
+    "name": "Williamsport Rgnl",
+    "lat": 41.24166660010815,
+    "lon": -76.92180544137955,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 106.01348114013672,
+        "lengthM": 1303.111083984375,
+        "widthM": 42.91952896118164,
+        "lat": 41.243416741490364,
+        "lon": -76.91902086138725,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 76.8722915649414,
+        "lengthM": 2078.210205078125,
+        "widthM": 44.04719924926758,
+        "lat": 41.24054476618767,
+        "lon": -76.92357391119003,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KIRK": {
+    "name": "Kirksville Rgnl",
+    "lat": 40.09347226470709,
+    "lon": -92.54491657018661,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 180.4861602783203,
+        "lengthM": 1817.3685302734375,
+        "widthM": 29.862939834594727,
+        "lat": 40.092490911483765,
+        "lon": -92.54431441426277,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 90.7219009399414,
+        "lengthM": 417.62841796875,
+        "widthM": 30.48000144958496,
+        "lat": 40.09778492152691,
+        "lon": -92.54763498902321,
+        "identReciprocal": "27",
+        "surface": "grass"
+      }
+    ]
+  },
+  "KJBR": {
+    "name": "Jonesboro Muni",
+    "lat": 35.831711031496525,
+    "lon": -90.6464222073555,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 134.7970428466797,
+        "lengthM": 1238.0489501953125,
+        "widthM": 43.72739028930664,
+        "lat": 35.827862061560154,
+        "lon": -90.65129265189171,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 50.06279373168945,
+        "lengthM": 1880.3153076171875,
+        "widthM": 42.776065826416016,
+        "lat": 35.83427421748638,
+        "lon": -90.64320847392082,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KJLN": {
+    "name": "Joplin Rgnl",
+    "lat": 37.15316668152809,
+    "lon": -94.49880838394165,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 138.10317993164062,
+        "lengthM": 1978.83203125,
+        "widthM": 43.55882263183594,
+        "lat": 37.15119291096926,
+        "lon": -94.49984684586525,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 181.8958282470703,
+        "lengthM": 1979.024658203125,
+        "widthM": 28.76930046081543,
+        "lat": 37.15516157448292,
+        "lon": -94.49781015515327,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 50.211631774902344,
+        "lengthM": 1093.3525390625,
+        "widthM": 22.586458206176758,
+        "lat": 37.14689400047064,
+        "lon": -94.4963563978672,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KJMS": {
+    "name": "Jamestown Rgnl",
+    "lat": 46.92972231656313,
+    "lon": -98.67819428443909,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 134.8793487548828,
+        "lengthM": 1978.927001953125,
+        "widthM": 28.828350067138672,
+        "lat": 46.92938033491373,
+        "lon": -98.67788851261139,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.63037872314453,
+        "lengthM": 1752.0911865234375,
+        "widthM": 22.860000610351562,
+        "lat": 46.930113919079304,
+        "lon": -98.67859125137329,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KJQF": {
+    "name": "Concord Regl",
+    "lat": 35.38776956498623,
+    "lon": -80.70913329720497,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 10.451951026916504,
+        "lengthM": 2252.95361328125,
+        "widthM": 29.065929412841797,
+        "lat": 35.387779623270035,
+        "lon": -80.70914134383202,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KJST": {
+    "name": "John Murtha Johnstown-Cambria",
+    "lat": 40.3155554831028,
+    "lon": -78.8346666097641,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 144.3081512451172,
+        "lengthM": 2133.751220703125,
+        "widthM": 45.720001220703125,
+        "lat": 40.31587868928909,
+        "lon": -78.83486419916153,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 39.210079193115234,
+        "lengthM": 1373.328369140625,
+        "widthM": 30.48000144958496,
+        "lat": 40.315186008811,
+        "lon": -78.83422404527664,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLAL": {
+    "name": "Lakeland Linder Rgnl",
+    "lat": 27.987639047205448,
+    "lon": -82.01899990439415,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.68669509887695,
+        "lengthM": 1520.6563720703125,
+        "widthM": 45.720001220703125,
+        "lat": 27.988330386579037,
+        "lon": -82.0149202644825,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10",
+        "headingTrueDeg": 89.85997772216797,
+        "lengthM": 2587.380859375,
+        "widthM": 45.720001220703125,
+        "lat": 27.989268489181995,
+        "lon": -82.02072009444237,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLAR": {
+    "name": "Laramie Rgnl",
+    "lat": 41.312055476009846,
+    "lon": -105.67499980330467,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 134.62966918945312,
+        "lengthM": 1918.195556640625,
+        "widthM": 30.48000144958496,
+        "lat": 41.31366144865751,
+        "lon": -105.67316249012947,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 45.481781005859375,
+        "lengthM": 2589.771728515625,
+        "widthM": 41.81769943237305,
+        "lat": 41.31086826324463,
+        "lon": -105.67634761333466,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLBE": {
+    "name": "Arnold Palmer Rgnl",
+    "lat": 40.27310013771057,
+    "lon": -79.41032499074936,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 45.63288879394531,
+        "lengthM": 2497.123046875,
+        "widthM": 29.513408660888672,
+        "lat": 40.27314003556967,
+        "lon": -79.41030710935593,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 19.68311882019043,
+        "lengthM": 1099.5648193359375,
+        "widthM": 20.7457218170166,
+        "lat": 40.27806121855974,
+        "lon": -79.3986202776432,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLBF": {
+    "name": "North Platte Rgnl Airport Lee",
+    "lat": 41.12621393054724,
+    "lon": -100.68365290760994,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.98834228515625,
+        "lengthM": 1349.9210205078125,
+        "widthM": 30.48000144958496,
+        "lat": 41.12695220857859,
+        "lon": -100.69303795695305,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 126.08960723876953,
+        "lengthM": 2438.112060546875,
+        "widthM": 45.720001220703125,
+        "lat": 41.125808246433735,
+        "lon": -100.67846953868866,
+        "identReciprocal": "30",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KLBL": {
+    "name": "Liberal Mid-America Rgnl",
+    "lat": 37.04391662031412,
+    "lon": -100.95997229218483,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 359.9029235839844,
+        "lengthM": 2157.561279296875,
+        "widthM": 30.922821044921875,
+        "lat": 37.04420126974583,
+        "lon": -100.9564246237278,
+        "identReciprocal": "17",
+        "surface": "concrete"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.77634811401367,
+        "lengthM": 1521.1915283203125,
+        "widthM": 23.60495948791504,
+        "lat": 37.04354748129845,
+        "lon": -100.96503093838692,
+        "identReciprocal": "22",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KLEB": {
+    "name": "Lebanon Muni",
+    "lat": 43.626111187040806,
+    "lon": -72.3041944205761,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 59.30955123901367,
+        "lengthM": 1675,
+        "widthM": 30,
+        "lat": 43.62970031797886,
+        "lon": -72.30314165353775,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 167.88710021972656,
+        "lengthM": 1585,
+        "widthM": 30,
+        "lat": 43.62231384962797,
+        "lon": -72.30531871318817,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLNS": {
+    "name": "Lancaster",
+    "lat": 40.12236099690199,
+    "lon": -76.29436120390892,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 119.22337341308594,
+        "lengthM": 1244.95556640625,
+        "widthM": 30.48000144958496,
+        "lat": 40.120439529418945,
+        "lon": -76.2974314391613,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 67.86878204345703,
+        "lengthM": 2113.454345703125,
+        "widthM": 45.720001220703125,
+        "lat": 40.12351501733065,
+        "lon": -76.29255697131157,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLRU": {
+    "name": "Las Cruces Intl",
+    "lat": 32.28941682726145,
+    "lon": -106.9219721853733,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.97490692138672,
+        "lengthM": 1845.23974609375,
+        "widthM": 28.03736686706543,
+        "lat": 32.28495933115482,
+        "lon": -106.9224402308464,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 135.15101623535156,
+        "lengthM": 2284.341796875,
+        "widthM": 27.522090911865234,
+        "lat": 32.29189921170473,
+        "lon": -106.9213718175888,
+        "identReciprocal": "30",
+        "surface": "concrete"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 54.517738342285156,
+        "lengthM": 2278.670166015625,
+        "widthM": 32.00400161743164,
+        "lat": 32.29054905474186,
+        "lon": -106.92221447825432,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLSE": {
+    "name": "La Crosse Rgnl",
+    "lat": 43.879266791045666,
+    "lon": -91.25663325190544,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 36.39025115966797,
+        "lengthM": 1584.655029296875,
+        "widthM": 45.720001220703125,
+        "lat": 43.87593783438206,
+        "lon": -91.2537382543087,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 134.4906463623047,
+        "lengthM": 1844.0400390625,
+        "widthM": 45.720001220703125,
+        "lat": 43.87926410883665,
+        "lon": -91.25612765550613,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.43727111816406,
+        "lengthM": 2664.572021484375,
+        "widthM": 45.720001220703125,
+        "lat": 43.88126604259014,
+        "lon": -91.2587222456932,
+        "identReciprocal": "36",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KLUK": {
+    "name": "Cincinnati Muni Airport Lunken",
+    "lat": 39.103333465754986,
+    "lon": -84.41861093044281,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 20.902591705322266,
+        "lengthM": 1857.0218505859375,
+        "widthM": 41.81325912475586,
+        "lat": 39.10055335611105,
+        "lon": -84.41564753651619,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 61.99009323120117,
+        "lengthM": 1561.367431640625,
+        "widthM": 28.784353256225586,
+        "lat": 39.10589061677456,
+        "lon": -84.4199475646019,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3L",
+        "headingTrueDeg": 22.622787475585938,
+        "lengthM": 1156.40283203125,
+        "widthM": 30.48000144958496,
+        "lat": 39.104440212249756,
+        "lon": -84.42158505320549,
+        "identReciprocal": "21R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLWB": {
+    "name": "Greenbrier Valley",
+    "lat": 37.85830568522215,
+    "lon": -80.39948344230652,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 35.35457229614258,
+        "lengthM": 2116.64111328125,
+        "widthM": 40.48147964477539,
+        "lat": 37.85833049565554,
+        "lon": -80.39949014782906,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KLYH": {
+    "name": "Lynchburg Rgnl/Preston Glenn F",
+    "lat": 37.325388975441456,
+    "lon": -79.20122221112251,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 161.2292938232422,
+        "lengthM": 1029.4085693359375,
+        "widthM": 20.75250244140625,
+        "lat": 37.32970967888832,
+        "lon": -79.19905811548233,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 27.670991897583008,
+        "lengthM": 2157.52099609375,
+        "widthM": 42.916831970214844,
+        "lat": 37.323314286768436,
+        "lon": -79.20230582356453,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMBS": {
+    "name": "Mbs Intl",
+    "lat": 43.53292789310217,
+    "lon": -84.0796360373497,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 135.72508239746094,
+        "lengthM": 1949.178955078125,
+        "widthM": 44.47639083862305,
+        "lat": 43.53096820414066,
+        "lon": -84.08110588788986,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 45.52195739746094,
+        "lengthM": 2436.259521484375,
+        "widthM": 44.62568664550781,
+        "lat": 43.53450603783131,
+        "lon": -84.07846748828888,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMCE": {
+    "name": "Merced Rgnl/Macready Field",
+    "lat": 37.284750156104565,
+    "lon": -120.51391661167145,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 138.64364624023438,
+        "lengthM": 1800.06640625,
+        "widthM": 42.03414535522461,
+        "lat": 37.28474646806717,
+        "lon": -120.51393315196037,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMCK": {
+    "name": "Mc Cook Ben Nelson Rgnl",
+    "lat": 40.206277929246426,
+    "lon": -100.59208318591118,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 131.51422119140625,
+        "lengthM": 1960.6915283203125,
+        "widthM": 27.461612701416016,
+        "lat": 40.206615552306175,
+        "lon": -100.59059053659439,
+        "identReciprocal": "30",
+        "surface": "concrete"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 181.91639709472656,
+        "lengthM": 410.8360595703125,
+        "widthM": 50.90692138671875,
+        "lat": 40.20368557423353,
+        "lon": -100.5920147895813,
+        "identReciprocal": "35",
+        "surface": "grass"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 45.78907012939453,
+        "lengthM": 1206.3565673828125,
+        "widthM": 22.05382537841797,
+        "lat": 40.206619910895824,
+        "lon": -100.59451147913933,
+        "identReciprocal": "22",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KMCN": {
+    "name": "Middle Georgia Rgnl",
+    "lat": 32.692833468317986,
+    "lon": -83.64922240376472,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 130.1878662109375,
+        "lengthM": 1518.4942626953125,
+        "widthM": 30.793901443481445,
+        "lat": 32.693962678313255,
+        "lon": -83.64455938339233,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23",
+        "headingTrueDeg": 227.8891143798828,
+        "lengthM": 1975.397216796875,
+        "widthM": 46.677677154541016,
+        "lat": 32.69200634211302,
+        "lon": -83.65279242396355,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMCW": {
+    "name": "Mason City Muni",
+    "lat": 43.157805539667606,
+    "lon": -93.33124995231628,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.8950958251953,
+        "lengthM": 1967.8460693359375,
+        "widthM": 43.29838562011719,
+        "lat": 43.15971661359072,
+        "lon": -93.32770898938179,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 125.04833221435547,
+        "lengthM": 1558.386474609375,
+        "widthM": 41.13854217529297,
+        "lat": 43.15579019486904,
+        "lon": -93.33599925041199,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMEI": {
+    "name": "Key Field",
+    "lat": 32.33261112123728,
+    "lon": -88.75186130404472,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 43.81418228149414,
+        "lengthM": 1393.0655517578125,
+        "widthM": 44.12278366088867,
+        "lat": 32.33557529747486,
+        "lon": -88.74767750501633,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 9.270658493041992,
+        "lengthM": 3048.5439453125,
+        "widthM": 43.46979522705078,
+        "lat": 32.33132265508175,
+        "lon": -88.75380098819733,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMGC": {
+    "name": "Michigan City Muni-Phillips Fi",
+    "lat": 41.70331668108702,
+    "lon": -86.82123899459839,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 20.20623779296875,
+        "lengthM": 1247.91162109375,
+        "widthM": 22.431812286376953,
+        "lat": 41.70332405716181,
+        "lon": -86.82124704122543,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMGW": {
+    "name": "Morgantown Muni-Walter L Bill",
+    "lat": 39.64359439909458,
+    "lon": -79.91754725575447,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 172.35052490234375,
+        "lengthM": 1569.095947265625,
+        "widthM": 45.720001220703125,
+        "lat": 39.64364670217037,
+        "lon": -79.91755798459053,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMHK": {
+    "name": "Manhattan Rgnl",
+    "lat": 39.14122235029936,
+    "lon": -96.6718053817749,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 142.32994079589844,
+        "lengthM": 1510.4805908203125,
+        "widthM": 18.985849380493164,
+        "lat": 39.14447620511055,
+        "lon": -96.67111828923225,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 39.7862548828125,
+        "lengthM": 2254.569091796875,
+        "widthM": 44.14324951171875,
+        "lat": 39.13933977484703,
+        "lon": -96.67186751961708,
+        "identReciprocal": "21",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KMKG": {
+    "name": "Muskegon Co",
+    "lat": 43.167672380805016,
+    "lon": -86.23543873429298,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 137.46810913085938,
+        "lengthM": 1855.306640625,
+        "widthM": 45.11015319824219,
+        "lat": 43.16886629909277,
+        "lon": -86.22979938983917,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 56.266937255859375,
+        "lengthM": 1977.9034423828125,
+        "widthM": 43.77664566040039,
+        "lat": 43.16657703369856,
+        "lon": -86.24075710773468,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMKL": {
+    "name": "Mc Kellar-Sipes Rgnl",
+    "lat": 35.599880665540695,
+    "lon": -88.91561105847359,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 112.37076568603516,
+        "lengthM": 1067.8741455078125,
+        "widthM": 30.48000144958496,
+        "lat": 35.602906197309494,
+        "lon": -88.91513228416443,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 22.178470611572266,
+        "lengthM": 1822.4796142578125,
+        "widthM": 45.720001220703125,
+        "lat": 35.59811141341925,
+        "lon": -88.91589045524597,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMSL": {
+    "name": "Northwest Alabama Rgnl",
+    "lat": 34.74530540406704,
+    "lon": -87.61022239923477,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 181.3361053466797,
+        "lengthM": 1216.14501953125,
+        "widthM": 28.608631134033203,
+        "lat": 34.74542677402496,
+        "lon": -87.61589705944061,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 114.14840698242188,
+        "lengthM": 2034.691162109375,
+        "widthM": 42.661827087402344,
+        "lat": 34.74526986479759,
+        "lon": -87.60686874389648,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMSS": {
+    "name": "Massena Intl-Richards Field",
+    "lat": 44.936241544783115,
+    "lon": -74.84511941671371,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 76.33059692382812,
+        "lengthM": 1212.765625,
+        "widthM": 30.48000144958496,
+        "lat": 44.935774840414524,
+        "lon": -74.8469889163971,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 31.182689666748047,
+        "lengthM": 1692.28369140625,
+        "widthM": 27.35593032836914,
+        "lat": 44.93660498410463,
+        "lon": -74.84379306435585,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMWA": {
+    "name": "Veterans Airport Of Southern I",
+    "lat": 37.754972241818905,
+    "lon": -89.01108339428902,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 107.7859878540039,
+        "lengthM": 1471.5767822265625,
+        "widthM": 27.67300033569336,
+        "lat": 37.749152183532715,
+        "lon": -89.00826707482338,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 22.56245994567871,
+        "lengthM": 2439.6826171875,
+        "widthM": 43.363224029541016,
+        "lat": 37.7585469558835,
+        "lon": -89.01268690824509,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMWL": {
+    "name": "Mineral Wells",
+    "lat": 32.781605534255505,
+    "lon": -98.06017488241196,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.57772827148438,
+        "lengthM": 1273.2845458984375,
+        "widthM": 30.48000144958496,
+        "lat": 32.78170611709356,
+        "lon": -98.0640734732151,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.7096405029297,
+        "lengthM": 1827.6680908203125,
+        "widthM": 30.48000144958496,
+        "lat": 32.78154652565718,
+        "lon": -98.05745556950569,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KMYL": {
+    "name": "Mc Call Muni",
+    "lat": 44.888744316995144,
+    "lon": -116.10175296664238,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 178.6619415283203,
+        "lengthM": 1859.7274169921875,
+        "widthM": 26.04810905456543,
+        "lat": 44.88874934613705,
+        "lon": -116.10178649425507,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KNYL": {
+    "name": "Yuma MCAS / Yuma Intl",
+    "lat": 32.65657503157854,
+    "lon": -114.60598602890968,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3R",
+        "headingTrueDeg": 43.98782730102539,
+        "lengthM": 2814.29248046875,
+        "widthM": 41.89131164550781,
+        "lat": 32.65785578638315,
+        "lon": -114.60207849740982,
+        "identReciprocal": "21L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.11180877685547,
+        "lengthM": 1873.0291748046875,
+        "widthM": 45.720001220703125,
+        "lat": 32.666032165288925,
+        "lon": -114.59567427635193,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.12307739257812,
+        "lengthM": 1740.2928466796875,
+        "widthM": 43.553226470947266,
+        "lat": 32.65986509621143,
+        "lon": -114.60392341017723,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3L",
+        "headingTrueDeg": 43.97290802001953,
+        "lengthM": 4052.359130859375,
+        "widthM": 56.126251220703125,
+        "lat": 32.64990974217653,
+        "lon": -114.61435809731483,
+        "identReciprocal": "21R",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KOAJ": {
+    "name": "Albert J Ellis",
+    "lat": 34.82916668057442,
+    "lon": -77.61213898658752,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.2964973449707,
+        "lengthM": 2162.1279296875,
+        "widthM": 41.63589859008789,
+        "lat": 34.829163663089275,
+        "lon": -77.61214658617973,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOGS": {
+    "name": "Ogdensburg Intl",
+    "lat": 44.68225009739399,
+    "lon": -75.46325013041496,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 75.94695281982422,
+        "lengthM": 1572.890625,
+        "widthM": 38.750553131103516,
+        "lat": 44.68186017125845,
+        "lon": -75.46549782156944,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOLF": {
+    "name": "L M Clayton",
+    "lat": 48.094500079751015,
+    "lon": -105.57505577802658,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 120.05631256103516,
+        "lengthM": 1539.3350830078125,
+        "widthM": 29.18330192565918,
+        "lat": 48.09450712054968,
+        "lon": -105.57505756616592,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOLM": {
+    "name": "Olympia Rgnl",
+    "lat": 46.969405598938465,
+    "lon": -122.90254443883896,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 103.7236557006836,
+        "lengthM": 1270.5592041015625,
+        "widthM": 46,
+        "lat": 46.96999166160822,
+        "lon": -122.8999337553978,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 191.28463745117188,
+        "lengthM": 1877.4595947265625,
+        "widthM": 46,
+        "lat": 46.96986325085163,
+        "lon": -122.90431156754494,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOPF": {
+    "name": "Miami-Opa Locka Executive",
+    "lat": 25.90741664171219,
+    "lon": -80.27822211384773,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9R",
+        "headingTrueDeg": 86.94791412353516,
+        "lengthM": 1312.7850341796875,
+        "widthM": 30.48000144958496,
+        "lat": 25.899358615279198,
+        "lon": -80.27862712740898,
+        "identReciprocal": "27L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 121.97386932373047,
+        "lengthM": 2072.21484375,
+        "widthM": 44.634483337402344,
+        "lat": 25.905681252479553,
+        "lon": -80.27999818325043,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9L",
+        "headingTrueDeg": 86.90909576416016,
+        "lengthM": 2438.707275390625,
+        "widthM": 44.771366119384766,
+        "lat": 25.913241058588028,
+        "lon": -80.27652069926262,
+        "identReciprocal": "27R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KORS": {
+    "name": "Orcas I",
+    "lat": 48.708336018025875,
+    "lon": -122.91059464216232,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 180.25689697265625,
+        "lengthM": 881.2600708007812,
+        "widthM": 15.633130073547363,
+        "lat": 48.70833434164524,
+        "lon": -122.91062325239182,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOWB": {
+    "name": "Owensboro-Daviess County Rgnl",
+    "lat": 37.738833390176296,
+    "lon": -87.16682776808739,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 177.7396240234375,
+        "lengthM": 2438.5,
+        "widthM": 43.43766784667969,
+        "lat": 37.73797374218702,
+        "lon": -87.16723769903183,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 51.83503341674805,
+        "lengthM": 1522.45556640625,
+        "widthM": 30.48000144958496,
+        "lat": 37.7402750775218,
+        "lon": -87.1662126481533,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KOXB": {
+    "name": "Ocean City Mun",
+    "lat": 38.31044431775808,
+    "lon": -75.12397214770317,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 133.2369384765625,
+        "lengthM": 1229.3326416015625,
+        "widthM": 19.707828521728516,
+        "lat": 38.3101948723197,
+        "lon": -75.12181922793388,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20",
+        "headingTrueDeg": 190.069091796875,
+        "lengthM": 963.3856201171875,
+        "widthM": 22.860000610351562,
+        "lat": 38.31078764051199,
+        "lon": -75.1267509162426,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPAH": {
+    "name": "Barkley Rgnl",
+    "lat": 37.060288824141026,
+    "lon": -88.77295821905136,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 139.67237854003906,
+        "lengthM": 1675.9429931640625,
+        "widthM": 42.43178939819336,
+        "lat": 37.060711942613125,
+        "lon": -88.7719877064228,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 43.56280517578125,
+        "lengthM": 1979.67578125,
+        "widthM": 43.340633392333984,
+        "lat": 37.05994013696909,
+        "lon": -88.7737986445427,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPBG": {
+    "name": "Plattsburgh Intl",
+    "lat": 44.650944359600544,
+    "lon": -73.46813902258873,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 157.5765380859375,
+        "lengthM": 3580.094970703125,
+        "widthM": 59.1902961730957,
+        "lat": 44.650952741503716,
+        "lon": -73.46811980009079,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPCW": {
+    "name": "Keller",
+    "lat": 41.516269482672215,
+    "lon": -82.86948591470718,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 177.8883819580078,
+        "lengthM": 1217.6187744140625,
+        "widthM": 20.845867156982422,
+        "lat": 41.51522107422352,
+        "lon": -82.86671116948128,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 82.57372283935547,
+        "lengthM": 1719.5443115234375,
+        "widthM": 28.059568405151367,
+        "lat": 41.51704262942076,
+        "lon": -82.87144213914871,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPDK": {
+    "name": "Dekalb-Peachtree",
+    "lat": 33.87600280344486,
+    "lon": -84.30203050374985,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3L",
+        "headingTrueDeg": 20.419265747070312,
+        "lengthM": 1143.8699951171875,
+        "widthM": 43.765743255615234,
+        "lat": 33.87375310063362,
+        "lon": -84.30343642830849,
+        "identReciprocal": "21R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3R",
+        "headingTrueDeg": 20.403945922851562,
+        "lengthM": 1828.5333251953125,
+        "widthM": 29.480857849121094,
+        "lat": 33.87631293386221,
+        "lon": -84.30053114891052,
+        "identReciprocal": "21L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 157.48573303222656,
+        "lengthM": 1210.8779296875,
+        "widthM": 44.27424621582031,
+        "lat": 33.87765001505613,
+        "lon": -84.30298447608948,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPDT": {
+    "name": "Eastern Oregon Rgnl At Pendlet",
+    "lat": 45.69476656615734,
+    "lon": -118.8430081307888,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 128.28341674804688,
+        "lengthM": 1701.1671142578125,
+        "widthM": 25.311952590942383,
+        "lat": 45.694087632000446,
+        "lon": -118.84523436427116,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.84645080566406,
+        "lengthM": 1915.9044189453125,
+        "widthM": 41.074562072753906,
+        "lat": 45.695371739566326,
+        "lon": -118.84106621146202,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPGV": {
+    "name": "Pitt-Greenville",
+    "lat": 35.63569452613592,
+    "lon": -77.38408327102661,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 66.63029479980469,
+        "lengthM": 1520.2374267578125,
+        "widthM": 45.720001220703125,
+        "lat": 35.63578438013792,
+        "lon": -77.3839008808136,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 7.514858722686768,
+        "lengthM": 2183.568115234375,
+        "widthM": 45.720001220703125,
+        "lat": 35.635660998523235,
+        "lon": -77.38421738147736,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPIB": {
+    "name": "Hattiesburg/Laurel Rgnl",
+    "lat": 31.467139050364494,
+    "lon": -89.33705538511276,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.90936279296875,
+        "lengthM": 1982.7275390625,
+        "widthM": 43.41099548339844,
+        "lat": 31.46714575588703,
+        "lon": -89.33706343173981,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPIR": {
+    "name": "Pierre Rgnl",
+    "lat": 44.38269428908825,
+    "lon": -100.28597205877304,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 140.74652099609375,
+        "lengthM": 2098.141845703125,
+        "widthM": 30.48000144958496,
+        "lat": 44.37757730484009,
+        "lon": -100.28547048568726,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 77.10569763183594,
+        "lengthM": 2099.193115234375,
+        "widthM": 45.89250564575195,
+        "lat": 44.38782401382923,
+        "lon": -100.28651878237724,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPKB": {
+    "name": "Mid-Ohio Valley Rgnl",
+    "lat": 39.344961270689964,
+    "lon": -81.43929451704025,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 94.95956420898438,
+        "lengthM": 1205.652587890625,
+        "widthM": 45.720001220703125,
+        "lat": 39.342795722186565,
+        "lon": -81.43968746066093,
+        "identReciprocal": "28",
+        "surface": "concrete"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 21.831336975097656,
+        "lengthM": 2202.0380859375,
+        "widthM": 45.720001220703125,
+        "lat": 39.346171617507935,
+        "lon": -81.43906161189079,
+        "identReciprocal": "21",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KPLN": {
+    "name": "Pellston Rgnl Airport Of Emmet",
+    "lat": 45.57091657072306,
+    "lon": -84.79672238230705,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.6934700012207,
+        "lengthM": 1646.2249755859375,
+        "widthM": 45.720001220703125,
+        "lat": 45.572639890015125,
+        "lon": -84.79538440704346,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 134.70753479003906,
+        "lengthM": 1985.1619873046875,
+        "widthM": 45.720001220703125,
+        "lat": 45.56947387754917,
+        "lon": -84.79788556694984,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KPQI": {
+    "name": "Northern Maine Rgnl Arpt At Pr",
+    "lat": 46.6889638826251,
+    "lon": -68.04479151964188,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 75.5765609741211,
+        "lengthM": 1829.0740966796875,
+        "widthM": 30.48000144958496,
+        "lat": 46.686327271163464,
+        "lon": -68.03930729627609,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 345.7384033203125,
+        "lengthM": 2267.391357421875,
+        "widthM": 45.720001220703125,
+        "lat": 46.691104620695114,
+        "lon": -68.04925829172134,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KRHI": {
+    "name": "Rhinelander-Oneida County",
+    "lat": 45.63090015202761,
+    "lon": -89.46662798523903,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 88.25531005859375,
+        "lengthM": 2073,
+        "widthM": 45.720001220703125,
+        "lat": 45.63059102743864,
+        "lon": -89.47333350777626,
+        "identReciprocal": "27",
+        "surface": "concrete"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 147.4500732421875,
+        "lengthM": 1585.21728515625,
+        "widthM": 30.48000144958496,
+        "lat": 45.63133366405964,
+        "lon": -89.45790588855743,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KRIW": {
+    "name": "Riverton Rgnl",
+    "lat": 43.06425008922815,
+    "lon": -108.45983326435089,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 114.3701400756836,
+        "lengthM": 2496.470458984375,
+        "widthM": 45.720001220703125,
+        "lat": 43.06492533534765,
+        "lon": -108.45857933163643,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 24.21438217163086,
+        "lengthM": 1462.014404296875,
+        "widthM": 22.860000610351562,
+        "lat": 43.06306790560484,
+        "lon": -108.46203178167343,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KRKD": {
+    "name": "Knox Co Regl",
+    "lat": 44.06014155596495,
+    "lon": -69.09966945648193,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 111.04513549804688,
+        "lengthM": 1526.236083984375,
+        "widthM": 30.48000144958496,
+        "lat": 44.059070348739624,
+        "lon": -69.09946784377098,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 13.45578384399414,
+        "lengthM": 1210.323486328125,
+        "widthM": 30.48000144958496,
+        "lat": 44.061375707387924,
+        "lon": -69.0989738702774,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KRUT": {
+    "name": "Rutland - Southern Vermont Rgn",
+    "lat": 43.52973069995642,
+    "lon": -72.94962510466576,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 118.69828796386719,
+        "lengthM": 966.615234375,
+        "widthM": 22.860000610351562,
+        "lat": 43.52704279124737,
+        "lon": -72.94945120811462,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 358.5515441894531,
+        "lengthM": 1615.696533203125,
+        "widthM": 29.71341323852539,
+        "lat": 43.53135176002979,
+        "lon": -72.94974356889725,
+        "identReciprocal": "19",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "KSAW": {
+    "name": "Sawyer Intl",
+    "lat": 46.34915817528963,
+    "lon": -87.39637210965157,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 8.953333854675293,
+        "lengthM": 2765.14599609375,
+        "widthM": 45.720001220703125,
+        "lat": 46.34922254830599,
+        "lon": -87.39637970924377,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSBD": {
+    "name": "San Bernardino Intl",
+    "lat": 34.09536123275757,
+    "lon": -117.23488882184029,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 70.43638610839844,
+        "lengthM": 3045.810546875,
+        "widthM": 60.16627883911133,
+        "lat": 34.09535754472017,
+        "lon": -117.23489820957184,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSDY": {
+    "name": "Sidney-Richland Rgnl",
+    "lat": 47.706861197948456,
+    "lon": -104.19255539774895,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 117.10651397705078,
+        "lengthM": 1224.521728515625,
+        "widthM": 30.48000144958496,
+        "lat": 47.709795869886875,
+        "lon": -104.18705508112907,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 23.634525299072266,
+        "lengthM": 1737.26220703125,
+        "widthM": 30.48000144958496,
+        "lat": 47.704802602529526,
+        "lon": -104.19644862413406,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSGJ": {
+    "name": "Northeast Florida Rgnl",
+    "lat": 29.95925009250641,
+    "lon": -81.3397304713726,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 20.998123168945312,
+        "lengthM": 835.9170532226562,
+        "widthM": 21.759124755859375,
+        "lat": 29.9576548486948,
+        "lon": -81.33965268731117,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 61.767913818359375,
+        "lengthM": 823.9867553710938,
+        "widthM": 21.94963836669922,
+        "lat": 29.9557363986969,
+        "lon": -81.33752569556236,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 126.45207977294922,
+        "lengthM": 2437.01513671875,
+        "widthM": 43.76128005981445,
+        "lat": 29.96091239154339,
+        "lon": -81.34054407477379,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSHD": {
+    "name": "Shenandoah Valley Regl",
+    "lat": 38.26383322477341,
+    "lon": -78.89644458889961,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 38.05066680908203,
+        "lengthM": 1827.248291015625,
+        "widthM": 45.720001220703125,
+        "lat": 38.263851664960384,
+        "lon": -78.89642804861069,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSKX": {
+    "name": "Taos Regl",
+    "lat": 36.45169459283352,
+    "lon": -105.67308336496353,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 137.52386474609375,
+        "lengthM": 2617.128662109375,
+        "widthM": 30.48000144958496,
+        "lat": 36.44738495349884,
+        "lon": -105.6737932562828,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 56.01524353027344,
+        "lengthM": 1676.19140625,
+        "widthM": 22.860000610351562,
+        "lat": 36.458407156169415,
+        "lon": -105.67199259996414,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSLK": {
+    "name": "Adirondack Rgnl",
+    "lat": 44.38530843704939,
+    "lon": -74.20618057250977,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 79.04898071289062,
+        "lengthM": 1214.8115234375,
+        "widthM": 25.392284393310547,
+        "lat": 44.381550662219524,
+        "lon": -74.2063196003437,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 34.77449417114258,
+        "lengthM": 2003.243408203125,
+        "widthM": 41.605018615722656,
+        "lat": 44.387608766555786,
+        "lon": -74.20610189437866,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSLN": {
+    "name": "Salina Rgnl",
+    "lat": 38.790611028671265,
+    "lon": -97.65222206711769,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 132.54559326171875,
+        "lengthM": 1982.3013916015625,
+        "widthM": 30.48000144958496,
+        "lat": 38.78757443279028,
+        "lon": -97.65854313969612,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.89019775390625,
+        "lengthM": 3748.80517578125,
+        "widthM": 45.720001220703125,
+        "lat": 38.79353228956461,
+        "lon": -97.64591574668884,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.90065002441406,
+        "lengthM": 1366.1834716796875,
+        "widthM": 22.860000610351562,
+        "lat": 38.788183964788914,
+        "lon": -97.66146630048752,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 48.762290954589844,
+        "lengthM": 1161.35888671875,
+        "widthM": 22.860000610351562,
+        "lat": 38.789583407342434,
+        "lon": -97.65125021338463,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSMN": {
+    "name": "Lemhi County",
+    "lat": 45.12327767908573,
+    "lon": -113.88144448399544,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 187.7969207763672,
+        "lengthM": 1678.5338134765625,
+        "widthM": 22.860000610351562,
+        "lat": 45.123294442892075,
+        "lon": -113.88145074248314,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSOW": {
+    "name": "Show Low Regl",
+    "lat": 34.265472292900085,
+    "lon": -110.0056640803814,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 76.02168273925781,
+        "lengthM": 2192.6982421875,
+        "widthM": 26.698509216308594,
+        "lat": 34.26618743687868,
+        "lon": -110.0073091685772,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 47.73624801635742,
+        "lengthM": 1197.4315185546875,
+        "widthM": 18.288002014160156,
+        "lat": 34.26420126110315,
+        "lon": -110.00266000628471,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSQL": {
+    "name": "San Carlos",
+    "lat": 37.51186117529869,
+    "lon": -122.24953070282936,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 137.9779510498047,
+        "lengthM": 793.2606811523438,
+        "widthM": 22.943561553955078,
+        "lat": 37.511867210268974,
+        "lon": -122.2495499253273,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSTC": {
+    "name": "St Cloud Rgnl",
+    "lat": 45.546222142875195,
+    "lon": -94.05938878655434,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 136.09178161621094,
+        "lengthM": 2130.175537109375,
+        "widthM": 44.4814567565918,
+        "lat": 45.54704390466213,
+        "lon": -94.05985191464424,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 59.18716049194336,
+        "lengthM": 913.183837890625,
+        "widthM": 22.21664810180664,
+        "lat": 45.54545033723116,
+        "lon": -94.05996412038803,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KSVC": {
+    "name": "Grant Co",
+    "lat": 32.636547312140465,
+    "lon": -108.15638601779938,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 90.19140625,
+        "lengthM": 2073.594970703125,
+        "widthM": 29.647157669067383,
+        "lat": 32.632401287555695,
+        "lon": -108.15422683954239,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 134.9649200439453,
+        "lengthM": 1422.784912109375,
+        "widthM": 29.18577766418457,
+        "lat": 32.63753101229668,
+        "lon": -108.1553940474987,
+        "identReciprocal": "30",
+        "surface": "dirt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.37408447265625,
+        "lengthM": 1654.2576904296875,
+        "widthM": 27.691457748413086,
+        "lat": 32.64057096093893,
+        "lon": -108.15854206681252,
+        "identReciprocal": "35",
+        "surface": "dirt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 45.276493072509766,
+        "lengthM": 1429.371337890625,
+        "widthM": 20.276689529418945,
+        "lat": 32.637621872127056,
+        "lon": -108.15782904624939,
+        "identReciprocal": "21",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "KSWO": {
+    "name": "Stillwater Rgnl",
+    "lat": 36.16138905286789,
+    "lon": -97.08588883280754,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.4964141845703,
+        "lengthM": 2255.698974609375,
+        "widthM": 29.81858253479004,
+        "lat": 36.16213973611593,
+        "lon": -97.08675786852837,
+        "identReciprocal": "35",
+        "surface": "concrete"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.348628997802734,
+        "lengthM": 1524.5313720703125,
+        "widthM": 22.793004989624023,
+        "lat": 36.160270906984806,
+        "lon": -97.08464562892914,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KTBN": {
+    "name": "Waynesville-St Robert Rgnl For",
+    "lat": 37.741638980805874,
+    "lon": -92.14072242379189,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 147.3792266845703,
+        "lengthM": 1840.1790771484375,
+        "widthM": 41.23400115966797,
+        "lat": 37.741634622216225,
+        "lon": -92.14075461030006,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KTIW": {
+    "name": "Tacoma Narrows",
+    "lat": 47.267944514751434,
+    "lon": -122.57811114192009,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 187.00015258789062,
+        "lengthM": 1523.2513427734375,
+        "widthM": 28.57180404663086,
+        "lat": 47.26794183254242,
+        "lon": -122.57812768220901,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KTVF": {
+    "name": "Thief River Falls Regl",
+    "lat": 48.06567773222923,
+    "lon": -96.18499428033829,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 134.87921142578125,
+        "lengthM": 1969.8203125,
+        "widthM": 44.46014404296875,
+        "lat": 48.06468330323696,
+        "lon": -96.18394151329994,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 39.13187026977539,
+        "lengthM": 1510.3916015625,
+        "widthM": 22.559946060180664,
+        "lat": 48.06699704378843,
+        "lon": -96.18640065193176,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KUIN": {
+    "name": "Quincy Rgnl-Baldwin Field",
+    "lat": 39.94301676750183,
+    "lon": -91.19446367025375,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 135.44345092773438,
+        "lengthM": 1644.757080078125,
+        "widthM": 45.720001220703125,
+        "lat": 39.94057461619377,
+        "lon": -91.19377166032791,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.30848693847656,
+        "lengthM": 1693.4290771484375,
+        "widthM": 45.720001220703125,
+        "lat": 39.944524839520454,
+        "lon": -91.19922950863838,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 40.204917907714844,
+        "lengthM": 2162.34619140625,
+        "widthM": 45.720001220703125,
+        "lat": 39.94358070194721,
+        "lon": -91.19138449430466,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KUUU": {
+    "name": "Newport State",
+    "lat": 41.53243884444237,
+    "lon": -71.28154456615448,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 23.790233612060547,
+        "lengthM": 914.09521484375,
+        "widthM": 22.860000610351562,
+        "lat": 41.5313508734107,
+        "lon": -71.28085792064667,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 143.78787231445312,
+        "lengthM": 799.4904174804688,
+        "widthM": 22.860000610351562,
+        "lat": 41.5336961299181,
+        "lon": -71.28234520554543,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KVCT": {
+    "name": "Victoria Rgnl",
+    "lat": 28.854205459356308,
+    "lon": -96.9187331199646,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 132.58755493164062,
+        "lengthM": 2921.3583984375,
+        "widthM": 45.720001220703125,
+        "lat": 28.854855559766293,
+        "lon": -96.9230429828167,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.84988403320312,
+        "lengthM": 1511.944580078125,
+        "widthM": 22.860000610351562,
+        "lat": 28.852127753198147,
+        "lon": -96.90974727272987,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KVEL": {
+    "name": "Vernal Rgnl",
+    "lat": 40.43607786297798,
+    "lon": -109.51142236590385,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16L",
+        "headingTrueDeg": 179.05471801757812,
+        "lengthM": 1887.0362548828125,
+        "widthM": 45.720001220703125,
+        "lat": 40.438362434506416,
+        "lon": -109.5105068385601,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KVLD": {
+    "name": "Valdosta Rgnl",
+    "lat": 30.7813723012805,
+    "lon": -83.27621966600418,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 126.09457397460938,
+        "lengthM": 1108.4830322265625,
+        "widthM": 22.860000610351562,
+        "lat": 30.781025625765324,
+        "lon": -83.27715039253235,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 170.88783264160156,
+        "lengthM": 2436.36767578125,
+        "widthM": 45.720001220703125,
+        "lat": 30.779610760509968,
+        "lon": -83.27319413423538,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 35.71299362182617,
+        "lengthM": 1592.8306884765625,
+        "widthM": 30.48000144958496,
+        "lat": 30.783766843378544,
+        "lon": -83.2802751660347,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KVRB": {
+    "name": "Vero Beach Rgnl",
+    "lat": 27.65555541962385,
+    "lon": -80.41794463992119,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12L",
+        "headingTrueDeg": 111.06645202636719,
+        "lengthM": 1068.0030517578125,
+        "widthM": 22.860000610351562,
+        "lat": 27.65866879373789,
+        "lon": -80.41185423731804,
+        "identReciprocal": "30R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12R",
+        "headingTrueDeg": 110.67259979248047,
+        "lengthM": 2225.87548828125,
+        "widthM": 32.30880355834961,
+        "lat": 27.654321268200874,
+        "lon": -80.41806802153587,
+        "identReciprocal": "30L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 35.96510314941406,
+        "lengthM": 1514.6607666015625,
+        "widthM": 30.48000144958496,
+        "lat": 27.655193656682968,
+        "lon": -80.42213872075081,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KWST": {
+    "name": "Westerly State",
+    "lat": 41.34963322430849,
+    "lon": -71.8034166097641,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 130.22604370117188,
+        "lengthM": 1202.3677978515625,
+        "widthM": 22.112361907958984,
+        "lat": 41.35048046708107,
+        "lon": -71.80199235677719,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 53.101932525634766,
+        "lengthM": 1213.306640625,
+        "widthM": 29.89234161376953,
+        "lat": 41.348904334008694,
+        "lon": -71.80476263165474,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KWYS": {
+    "name": "Yellowstone",
+    "lat": 44.688389003276825,
+    "lon": -111.11763909459114,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 26.250207901000977,
+        "lengthM": 2556.2421875,
+        "widthM": 45.720001220703125,
+        "lat": 44.68838833272457,
+        "lon": -111.11766949295998,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "KXWA": {
+    "name": "Williston Basin Intl",
+    "lat": 48.25978349894285,
+    "lon": -103.7505555152893,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 147.7629852294922,
+        "lengthM": 2285.705810546875,
+        "widthM": 45.7005500793457,
+        "lat": 48.260873816907406,
+        "lon": -103.75115007162094,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PABE": {
+    "name": "Bethel",
+    "lat": 60.778555534780025,
+    "lon": -161.8371668457985,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1R",
+        "headingTrueDeg": 23.477191925048828,
+        "lengthM": 1206.6436767578125,
+        "widthM": 19.53229331970215,
+        "lat": 60.776027888059616,
+        "lon": -161.8355418741703,
+        "identReciprocal": "19L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 128.63963317871094,
+        "lengthM": 560.443115234375,
+        "widthM": 22.860000610351562,
+        "lat": 60.779745765030384,
+        "lon": -161.84374004602432,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "1L",
+        "headingTrueDeg": 23.526329040527344,
+        "lengthM": 1947.791259765625,
+        "widthM": 45.720001220703125,
+        "lat": 60.779798068106174,
+        "lon": -161.8364578485489,
+        "identReciprocal": "19R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PABR": {
+    "name": "Wiley Post-Will Rogers Memoria",
+    "lat": 71.2848611176014,
+    "lon": -156.76858350634575,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.96746826171875,
+        "lengthM": 2042.5052490234375,
+        "widthM": 45.298484802246094,
+        "lat": 71.28548707813025,
+        "lon": -156.76543191075325,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PACD": {
+    "name": "Cold Bay",
+    "lat": 55.20591661334038,
+    "lon": -162.72624984383583,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 158.40237426757812,
+        "lengthM": 3111.50146484375,
+        "widthM": 43.354305267333984,
+        "lat": 55.20940952003002,
+        "lon": -162.72902503609657,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 94.92501831054688,
+        "lengthM": 1897.70263671875,
+        "widthM": 47.48274230957031,
+        "lat": 55.19843325018883,
+        "lon": -162.71749779582024,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PACV": {
+    "name": "Merle K (Mudhole) Smith",
+    "lat": 60.49163896590471,
+    "lon": -145.4775582253933,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 180.62574768066406,
+        "lengthM": 664.2139282226562,
+        "widthM": 24.57448387145996,
+        "lat": 60.48849407583475,
+        "lon": -145.47670304775238,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 114.33312225341797,
+        "lengthM": 2283.685302734375,
+        "widthM": 45.026153564453125,
+        "lat": 60.492509342730045,
+        "lon": -145.47780856490135,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PADE": {
+    "name": "Deering",
+    "lat": 66.0691112279892,
+    "lon": -162.7670556306839,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 126.44868469238281,
+        "lengthM": 872.1929931640625,
+        "widthM": 15.981913566589355,
+        "lat": 66.06954138725996,
+        "lon": -162.76693761348724,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 218.1039581298828,
+        "lengthM": 1115.671875,
+        "widthM": 18.08965301513672,
+        "lat": 66.06889128684998,
+        "lon": -162.76715710759163,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PADK": {
+    "name": "Adak",
+    "lat": 51.88358332961798,
+    "lon": -176.64248317480087,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 184.7711944580078,
+        "lengthM": 2309.00341796875,
+        "widthM": 58.198604583740234,
+        "lat": 51.87233313918114,
+        "lon": -176.64959639310837,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23",
+        "headingTrueDeg": 240.53033447265625,
+        "lengthM": 2391.968505859375,
+        "widthM": 61.48762512207031,
+        "lat": 51.883602775633335,
+        "lon": -176.64248540997505,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PADL": {
+    "name": "Dillingham",
+    "lat": 59.04466666281223,
+    "lon": -158.5054998099804,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 26.462827682495117,
+        "lengthM": 1947.8392333984375,
+        "widthM": 40.54005813598633,
+        "lat": 59.044693149626255,
+        "lon": -158.5055346786976,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PADQ": {
+    "name": "Kodiak",
+    "lat": 57.74979438632727,
+    "lon": -152.49394431710243,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 22.356014251708984,
+        "lengthM": 1518.0103759765625,
+        "widthM": 45.720001220703125,
+        "lat": 57.745964862406254,
+        "lon": -152.48837023973465,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 91.8592529296875,
+        "lengthM": 2293.070068359375,
+        "widthM": 43.230690002441406,
+        "lat": 57.75175206363201,
+        "lon": -152.49991849064827,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 126.9773178100586,
+        "lengthM": 1643.3118896484375,
+        "widthM": 41.674888610839844,
+        "lat": 57.75039352476597,
+        "lon": -152.49135062098503,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PADU": {
+    "name": "Unalaska",
+    "lat": 53.898944556713104,
+    "lon": -166.54502794146538,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "31",
+        "headingTrueDeg": 315.6801452636719,
+        "lengthM": 1258.6627197265625,
+        "widthM": 29.404232025146484,
+        "lat": 53.89885067939758,
+        "lon": -166.5449984371662,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAEM": {
+    "name": "Emmonak",
+    "lat": 62.78613902628422,
+    "lon": -164.49074998497963,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 176.7090301513672,
+        "lengthM": 1591.0166015625,
+        "widthM": 48.058624267578125,
+        "lat": 62.78612796217203,
+        "lon": -164.49078530073166,
+        "identReciprocal": "34",
+        "surface": "grass"
+      }
+    ]
+  },
+  "PAEN": {
+    "name": "Kenai Muni",
+    "lat": 60.573277696967125,
+    "lon": -151.24483332037926,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2R",
+        "headingTrueDeg": 31.023225784301758,
+        "lengthM": 603.3421020507812,
+        "widthM": 22.860000610351562,
+        "lat": 60.57728759944439,
+        "lon": -151.2354102730751,
+        "identReciprocal": "20L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2L",
+        "headingTrueDeg": 30.86742401123047,
+        "lengthM": 2390.04296875,
+        "widthM": 45.720001220703125,
+        "lat": 60.572278909385204,
+        "lon": -151.24719724059105,
+        "identReciprocal": "20R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAFA": {
+    "name": "Fairbanks Intl",
+    "lat": 64.8153555393219,
+    "lon": -147.85665839910507,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 37.9208869934082,
+        "lengthM": 875.2415771484375,
+        "widthM": 22.860000610351562,
+        "lat": 64.81914415955544,
+        "lon": -147.84090220928192,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2L",
+        "headingTrueDeg": 38.08785629272461,
+        "lengthM": 3597.8330078125,
+        "widthM": 44.32378005981445,
+        "lat": 64.81532100588083,
+        "lon": -147.86261156201363,
+        "identReciprocal": "20R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2R",
+        "headingTrueDeg": 38.007991790771484,
+        "lengthM": 1981.474853515625,
+        "widthM": 27.90007781982422,
+        "lat": 64.80723582208157,
+        "lon": -147.86280021071434,
+        "identReciprocal": "20L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAFM": {
+    "name": "Ambler",
+    "lat": 67.10620008409023,
+    "lon": -157.8571553528309,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 292.51983642578125,
+        "lengthM": 724.9843139648438,
+        "widthM": 40.26798629760742,
+        "lat": 67.10841525346041,
+        "lon": -157.86191582679749,
+        "identReciprocal": "10",
+        "surface": "concrete"
+      },
+      {
+        "ident": "1",
+        "headingTrueDeg": 21.613603591918945,
+        "lengthM": 834.9483032226562,
+        "widthM": 44.19645690917969,
+        "lat": 67.10269343107939,
+        "lon": -157.85791978240013,
+        "identReciprocal": "19",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "PAGA": {
+    "name": "Edward G Pitka Sr",
+    "lat": 64.73618879914284,
+    "lon": -156.93455547094345,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.56214904785156,
+        "lengthM": 2208.189208984375,
+        "widthM": 40.16279602050781,
+        "lat": 64.7360198199749,
+        "lon": -156.93703427910805,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAGK": {
+    "name": "Gulkana",
+    "lat": 62.15433597564697,
+    "lon": -145.45529186725616,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15L",
+        "headingTrueDeg": 171.0261688232422,
+        "lengthM": 1524.9019775390625,
+        "widthM": 28.406015396118164,
+        "lat": 62.15494852513075,
+        "lon": -145.45433923602104,
+        "identReciprocal": "33R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAGM": {
+    "name": "Gambell",
+    "lat": 63.76661650836468,
+    "lon": -171.7327831685543,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 172.08633422851562,
+        "lengthM": 1371.7486572265625,
+        "widthM": 29.260801315307617,
+        "lat": 63.766598738729954,
+        "lon": -171.73280909657478,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAGS": {
+    "name": "Gustavus",
+    "lat": 58.42527788132429,
+    "lon": -135.70741653442383,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 135.04579162597656,
+        "lengthM": 2045.0322265625,
+        "widthM": 44.87226867675781,
+        "lat": 58.42620424926281,
+        "lon": -135.70504054427147,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 40.982704162597656,
+        "lengthM": 1010.0663452148438,
+        "widthM": 18.288002014160156,
+        "lat": 58.4234781190753,
+        "lon": -135.71263387799263,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAHC": {
+    "name": "Holy Cross",
+    "lat": 62.18830548226833,
+    "lon": -159.77494463324547,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 31.277759552001953,
+        "lengthM": 1409.0167236328125,
+        "widthM": 41.77812576293945,
+        "lat": 62.188245467841625,
+        "lon": -159.77507919073105,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAHL": {
+    "name": "Huslia",
+    "lat": 65.69786097854376,
+    "lon": -156.35138869285583,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 231.00704956054688,
+        "lengthM": 1230.5830078125,
+        "widthM": 42.61106491088867,
+        "lat": 65.69789484143257,
+        "lon": -156.35148525238037,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAHN": {
+    "name": "Haines",
+    "lat": 59.243830405175686,
+    "lon": -135.52353903651237,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 110.14891052246094,
+        "lengthM": 1212.293212890625,
+        "widthM": 28.9041805267334,
+        "lat": 59.24376871436834,
+        "lon": -135.52358955144882,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAHO": {
+    "name": "Homer",
+    "lat": 59.64499432593584,
+    "lon": -151.48580834269524,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 235.01278686523438,
+        "lengthM": 2042.40380859375,
+        "widthM": 44.857425689697266,
+        "lat": 59.6455492079258,
+        "lon": -151.47664323449135,
+        "identReciprocal": "4",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAII": {
+    "name": "Egegik",
+    "lat": 58.18548873066902,
+    "lon": -157.37542793154716,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 139.69503784179688,
+        "lengthM": 1712.74755859375,
+        "widthM": 35.706626892089844,
+        "lat": 58.18542469292879,
+        "lon": -157.3762822151184,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 229.3526153564453,
+        "lengthM": 460.49530029296875,
+        "widthM": 27.466102600097656,
+        "lat": 58.1855571269989,
+        "lon": -157.37214624881744,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAIK": {
+    "name": "Bob Baker Memorial",
+    "lat": 66.97617765516043,
+    "lon": -160.43860003352165,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 81.76416778564453,
+        "lengthM": 1102.6400146484375,
+        "widthM": 15.572190284729004,
+        "lat": 66.9759664312005,
+        "lon": -160.43659552931786,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAIL": {
+    "name": "Iliamna",
+    "lat": 59.75557778030634,
+    "lon": -154.91775289177895,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 92.45162963867188,
+        "lengthM": 1546.085693359375,
+        "widthM": 27.79581069946289,
+        "lat": 59.75162789225578,
+        "lon": -154.91021141409874,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 189.05560302734375,
+        "lengthM": 1458.8375244140625,
+        "widthM": 29.003673553466797,
+        "lat": 59.75617691874504,
+        "lon": -154.91163074970245,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAJN": {
+    "name": "Juneau Intl",
+    "lat": 58.35471097379923,
+    "lon": -134.5784693956375,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 104.89319610595703,
+        "lengthM": 2695,
+        "widthM": 46,
+        "lat": 58.354743495583534,
+        "lon": -134.57469418644905,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAKN": {
+    "name": "King Salmon",
+    "lat": 58.67649458348751,
+    "lon": -156.64869144558907,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 131.94212341308594,
+        "lengthM": 2710.84423828125,
+        "widthM": 45.720001220703125,
+        "lat": 58.6757905036211,
+        "lon": -156.6473986208439,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 196.342529296875,
+        "lengthM": 1425.990478515625,
+        "widthM": 30.306337356567383,
+        "lat": 58.67830205708742,
+        "lon": -156.6516910493374,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAKP": {
+    "name": "Anaktuvuk Pass",
+    "lat": 68.13361119478941,
+    "lon": -151.74333348870277,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 38.156253814697266,
+        "lengthM": 1661.875,
+        "widthM": 34.14813232421875,
+        "lat": 68.13366953283548,
+        "lon": -151.74340590834618,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAKT": {
+    "name": "Ketchikan Intl",
+    "lat": 55.35408318042755,
+    "lon": -131.7112223803997,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 135.6155548095703,
+        "lengthM": 2285.354736328125,
+        "widthM": 44.08006286621094,
+        "lat": 55.35408150404692,
+        "lon": -131.71125188469887,
+        "identReciprocal": "29",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "PAKW": {
+    "name": "Klawock",
+    "lat": 55.57922210544348,
+    "lon": -133.07600006461143,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 39.00677490234375,
+        "lengthM": 1511.7498779296875,
+        "widthM": 29.315753936767578,
+        "lat": 55.57922042906284,
+        "lon": -133.07599738240242,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAMC": {
+    "name": "Mc Grath",
+    "lat": 62.952783331274986,
+    "lon": -155.60704708099365,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 178.9767608642578,
+        "lengthM": 1808.8282470703125,
+        "widthM": 30.48000144958496,
+        "lat": 62.951088175177574,
+        "lon": -155.60496523976326,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 67.51324462890625,
+        "lengthM": 609.6452026367188,
+        "widthM": 18.288002014160156,
+        "lat": 62.95782085508108,
+        "lon": -155.61328321695328,
+        "identReciprocal": "23",
+        "surface": "gravel"
+      }
+    ]
+  },
+  "PAMR": {
+    "name": "Merrill Field",
+    "lat": 61.213544458150864,
+    "lon": -149.84472513198853,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 66.06011962890625,
+        "lengthM": 609.7742309570312,
+        "widthM": 18.288002014160156,
+        "lat": 61.21077809482813,
+        "lon": -149.84001517295837,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.99469757080078,
+        "lengthM": 1218.998046875,
+        "widthM": 28.037548065185547,
+        "lat": 61.21590010821819,
+        "lon": -149.8420250415802,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.0556182861328,
+        "lengthM": 802.3905639648438,
+        "widthM": 20.93916893005371,
+        "lat": 61.212065890431404,
+        "lon": -149.85261216759682,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAMY": {
+    "name": "Mekoryuk",
+    "lat": 60.37238895893097,
+    "lon": -166.27019450068474,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 245.0806884765625,
+        "lengthM": 1112.0247802734375,
+        "widthM": 49.710262298583984,
+        "lat": 60.37238661199808,
+        "lon": -166.2702378630638,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PANC": {
+    "name": "Ted Stevens Anchorage Intl",
+    "lat": 61.17408614605665,
+    "lon": -149.9981389939785,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "7L",
+        "headingTrueDeg": 89.90184020996094,
+        "lengthM": 3230.099853515625,
+        "widthM": 44.79075622558594,
+        "lat": 61.16980031132698,
+        "lon": -149.9784404039383,
+        "identReciprocal": "25R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7R",
+        "headingTrueDeg": 89.89114379882812,
+        "lengthM": 3778.155517578125,
+        "widthM": 62,
+        "lat": 61.1678547039628,
+        "lon": -150.00780522823334,
+        "identReciprocal": "25L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 164.87757873535156,
+        "lengthM": 3308.913330078125,
+        "widthM": 60,
+        "lat": 61.18538025766611,
+        "lon": -150.00656560063362,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PANI": {
+    "name": "Aniak",
+    "lat": 61.58140540122986,
+    "lon": -159.54529702663422,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 121.2296371459961,
+        "lengthM": 1825.994384765625,
+        "widthM": 39.52463150024414,
+        "lat": 61.58160086721182,
+        "lon": -159.54308912158012,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PANV": {
+    "name": "Anvik",
+    "lat": 62.64733336865902,
+    "lon": -160.1900553703308,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 186.30203247070312,
+        "lengthM": 1225.945556640625,
+        "widthM": 21.732826232910156,
+        "lat": 62.64737159013748,
+        "lon": -160.19002810120583,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAOM": {
+    "name": "Nome",
+    "lat": 64.51255559921265,
+    "lon": -165.44438883662224,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 109.89080047607422,
+        "lengthM": 1832.2490234375,
+        "widthM": 42.05406951904297,
+        "lat": 64.51151087880135,
+        "lon": -165.4502074420452,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 41.70774841308594,
+        "lengthM": 1878.6744384765625,
+        "widthM": 45.720001220703125,
+        "lat": 64.51353326439857,
+        "lon": -165.43879508972168,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAOR": {
+    "name": "Northway",
+    "lat": 62.96116657555103,
+    "lon": -141.92808330059052,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 76.10859680175781,
+        "lengthM": 1551.5732421875,
+        "widthM": 30.48000144958496,
+        "lat": 62.9611786454916,
+        "lon": -141.92811995744705,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAOT": {
+    "name": "Ralph Wien Memorial",
+    "lat": 66.8848055228591,
+    "lon": -162.59813904762268,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 194.202392578125,
+        "lengthM": 1174.4033203125,
+        "widthM": 18.123046875,
+        "lat": 66.88004527240992,
+        "lon": -162.61261716485023,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 101.81199645996094,
+        "lengthM": 1911.7098388671875,
+        "widthM": 43.502479553222656,
+        "lat": 66.88783407211304,
+        "lon": -162.58936285972595,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAPB": {
+    "name": "St George",
+    "lat": 56.57736126333475,
+    "lon": -169.66372221708298,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 118.57427978515625,
+        "lengthM": 1512.97216796875,
+        "widthM": 44.6904296875,
+        "lat": 56.577359922230244,
+        "lon": -169.6636739373207,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAPG": {
+    "name": "Petersburg James A Johnson",
+    "lat": 56.80147223174572,
+    "lon": -132.94622227549553,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 70.76287841796875,
+        "lengthM": 1951.1937255859375,
+        "widthM": 42.95938491821289,
+        "lat": 56.80146250873804,
+        "lon": -132.9462593793869,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAPH": {
+    "name": "Port Heiden",
+    "lat": 56.9590999558568,
+    "lon": -158.63336116075516,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "32",
+        "headingTrueDeg": 327.5601501464844,
+        "lengthM": 1604.987060546875,
+        "widthM": 36.63962936401367,
+        "lat": 56.95927329361439,
+        "lon": -158.64735692739487,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 70.42578125,
+        "lengthM": 2281.29638671875,
+        "widthM": 45.64726638793945,
+        "lat": 56.959821470081806,
+        "lon": -158.61932829022408,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAPM": {
+    "name": "Platinum",
+    "lat": 59.01783049106598,
+    "lon": -161.8271917104721,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "32",
+        "headingTrueDeg": 334.7799072265625,
+        "lengthM": 1706.436279296875,
+        "widthM": 46.09324264526367,
+        "lat": 59.01783987879753,
+        "lon": -161.82726725935936,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAQT": {
+    "name": "Nuiqsut",
+    "lat": 70.20983342081308,
+    "lon": -151.0064721107483,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 249.5403289794922,
+        "lengthM": 1547.655029296875,
+        "widthM": 49.49150848388672,
+        "lat": 70.2097599953413,
+        "lon": -151.00709974765778,
+        "identReciprocal": "5",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "PARC": {
+    "name": "Arctic Village",
+    "lat": 68.11466943472624,
+    "lon": -145.57941645383835,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 44.49983596801758,
+        "lengthM": 1371.8160400390625,
+        "widthM": 22.860000610351562,
+        "lat": 68.11466909945011,
+        "lon": -145.57941287755966,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PARY": {
+    "name": "Ruby",
+    "lat": 64.72722217440605,
+    "lon": -155.46988874673843,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 50.855430603027344,
+        "lengthM": 1411.2279052734375,
+        "widthM": 30.48000144958496,
+        "lat": 64.7272365912795,
+        "lon": -155.4700031876564,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PASA": {
+    "name": "Savoonga",
+    "lat": 63.68627764284611,
+    "lon": -170.49316674470901,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 59.57857131958008,
+        "lengthM": 1537.884765625,
+        "widthM": 30.48000144958496,
+        "lat": 63.686300441622734,
+        "lon": -170.4930853843689,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PASC": {
+    "name": "Deadhorse",
+    "lat": 70.19554730504751,
+    "lon": -148.46578896045685,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 254.97412109375,
+        "lengthM": 1977.42578125,
+        "widthM": 45.720001220703125,
+        "lat": 70.1947433128953,
+        "lon": -148.4652355313301,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "24R",
+        "headingTrueDeg": 254.8797607421875,
+        "lengthM": 1969.04931640625,
+        "widthM": 28.47306251525879,
+        "lat": 70.19632715731859,
+        "lon": -148.4664872288704,
+        "identReciprocal": "6L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PASD": {
+    "name": "Sand Point",
+    "lat": 55.3136944770813,
+    "lon": -160.5214248597622,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 148.6167755126953,
+        "lengthM": 1586.637939453125,
+        "widthM": 44.617244720458984,
+        "lat": 55.31369514763355,
+        "lon": -160.52146464586258,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PASI": {
+    "name": "Sitka Rocky Gutierrez",
+    "lat": 57.0468333363533,
+    "lon": -135.3610695898533,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 135.5017852783203,
+        "lengthM": 2121.72998046875,
+        "widthM": 43.46597671508789,
+        "lat": 57.04660903662443,
+        "lon": -135.36072492599487,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PASN": {
+    "name": "St Paul Island",
+    "lat": 57.166305631399155,
+    "lon": -170.22255554795265,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 189.70144653320312,
+        "lengthM": 1967.805908203125,
+        "widthM": 43.95641326904297,
+        "lat": 57.16634385287762,
+        "lon": -170.2225622534752,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PATQ": {
+    "name": "Atqasuk Edward Burnell Sr Memori",
+    "lat": 70.4671112447977,
+    "lon": -157.43566676974297,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 260.8891906738281,
+        "lengthM": 1529.1683349609375,
+        "widthM": 50.981929779052734,
+        "lat": 70.4671360552311,
+        "lon": -157.43569761514664,
+        "identReciprocal": "7",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "PAUN": {
+    "name": "Unalakleet",
+    "lat": 63.88850010931492,
+    "lon": -160.799111276865,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 164.13233947753906,
+        "lengthM": 1795.8135986328125,
+        "widthM": 45.720001220703125,
+        "lat": 63.8902522623539,
+        "lon": -160.80105677247047,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 98.2802963256836,
+        "lengthM": 579.1397094726562,
+        "widthM": 22.860000610351562,
+        "lat": 63.88307332992554,
+        "lon": -160.79318761825562,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAVD": {
+    "name": "Valdez Airport",
+    "lat": 61.13422214984894,
+    "lon": -146.24476924538612,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 81.30001831054688,
+        "lengthM": 1981.45166015625,
+        "widthM": 46,
+        "lat": 61.13421846181154,
+        "lon": -146.24475985765457,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAWG": {
+    "name": "Wrangell",
+    "lat": 56.48433320224285,
+    "lon": -132.36983343958855,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 121.46137237548828,
+        "lengthM": 1827.8056640625,
+        "widthM": 44.50300979614258,
+        "lat": 56.48432046175003,
+        "lon": -132.36988484859467,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAWI": {
+    "name": "Wainwright",
+    "lat": 70.63800014555454,
+    "lon": -159.99474987387657,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 67.0860366821289,
+        "lengthM": 1533.072509765625,
+        "widthM": 46.74127197265625,
+        "lat": 70.63797131180763,
+        "lon": -159.99456480145454,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PAYA": {
+    "name": "Yakutat",
+    "lat": 59.503322057425976,
+    "lon": -139.66026932001114,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 135.0787811279297,
+        "lengthM": 2359.87109375,
+        "widthM": 45.720001220703125,
+        "lat": 59.5038853213191,
+        "lon": -139.65027540922165,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2",
+        "headingTrueDeg": 44.60021209716797,
+        "lengthM": 1938.3433837890625,
+        "widthM": 46.710567474365234,
+        "lat": 59.50251638889313,
+        "lon": -139.67278227210045,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PFYU": {
+    "name": "Fort Yukon",
+    "lat": 66.5724166855216,
+    "lon": -145.2463334798813,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 59.905029296875,
+        "lengthM": 1701.446533203125,
+        "widthM": 33.806209564208984,
+        "lat": 66.5719784796238,
+        "lon": -145.24801164865494,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHHN": {
+    "name": "Hana",
+    "lat": 20.79563621431589,
+    "lon": -156.01443886756897,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.95578002929688,
+        "lengthM": 1096.386474609375,
+        "widthM": 26.740921020507812,
+        "lat": 20.79564392566681,
+        "lon": -156.0144406557083,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHJH": {
+    "name": "Kapalua",
+    "lat": 20.962935984134674,
+    "lon": -156.67303070425987,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 27.920923233032227,
+        "lengthM": 922.1743774414062,
+        "widthM": 30.48000144958496,
+        "lat": 20.962957106530666,
+        "lon": -156.67304903268814,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHKO": {
+    "name": "Ellison Onizuka Kona Intl At K",
+    "lat": 19.738766737282276,
+    "lon": -156.045630723238,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 184.81590270996094,
+        "lengthM": 3353.705322265625,
+        "widthM": 47.961700439453125,
+        "lat": 19.738769754767418,
+        "lon": -156.04567408561707,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHLI": {
+    "name": "Lihue",
+    "lat": 21.975983195006847,
+    "lon": -159.33895826339722,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.01882934570312,
+        "lengthM": 1981.467041015625,
+        "widthM": 45.720001220703125,
+        "lat": 21.97274509817362,
+        "lon": -159.33591440320015,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3",
+        "headingTrueDeg": 44.879329681396484,
+        "lengthM": 1987.3065185546875,
+        "widthM": 48.97609329223633,
+        "lat": 21.979224644601345,
+        "lon": -159.34209018945694,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHMK": {
+    "name": "Molokai",
+    "lat": 21.152886003255844,
+    "lon": -157.0962555706501,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 60.331912994384766,
+        "lengthM": 1369.073974609375,
+        "widthM": 30.48000144958496,
+        "lat": 21.152692213654518,
+        "lon": -157.09536641836166,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.7815399169922,
+        "lengthM": 951.8499755859375,
+        "widthM": 30.48000144958496,
+        "lat": 21.153183057904243,
+        "lon": -157.09760159254074,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHMU": {
+    "name": "Waimea-Kohala",
+    "lat": 20.001327842473984,
+    "lon": -155.66810846328735,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 52.0468864440918,
+        "lengthM": 1586.9107666015625,
+        "widthM": 29.137928009033203,
+        "lat": 20.001367069780827,
+        "lon": -155.6681402027607,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHNY": {
+    "name": "Lanai",
+    "lat": 20.785611122846603,
+    "lon": -156.95141941308975,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 43.974159240722656,
+        "lengthM": 1523.184814453125,
+        "widthM": 45.720001220703125,
+        "lat": 20.78562218695879,
+        "lon": -156.95146545767784,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHOG": {
+    "name": "Kahului",
+    "lat": 20.898650139570236,
+    "lon": -156.43045842647552,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 34.807952880859375,
+        "lengthM": 2134.31640625,
+        "widthM": 48.303428649902344,
+        "lat": 20.897050872445107,
+        "lon": -156.4304579794407,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 64.8762435913086,
+        "lengthM": 1514.916748046875,
+        "widthM": 46.44548416137695,
+        "lat": 20.900931358337402,
+        "lon": -156.43049865961075,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHTO": {
+    "name": "Hilo Intl",
+    "lat": 19.720263853669167,
+    "lon": -155.04846945405006,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 40.829803466796875,
+        "lengthM": 1706.67333984375,
+        "widthM": 48.33734130859375,
+        "lat": 19.71837993711233,
+        "lon": -155.05713298916817,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 90.0029296875,
+        "lengthM": 2983.612060546875,
+        "widthM": 44.894317626953125,
+        "lat": 19.721465818583965,
+        "lon": -155.04357129335403,
+        "identReciprocal": "26",
         "surface": "asphalt"
       }
     ]

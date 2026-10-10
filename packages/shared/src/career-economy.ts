@@ -934,6 +934,7 @@ import {
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertUsHiCareerHubCatalog } from './career-us-hi-hubs.js';
+import { assertUsAkCareerHubCatalog } from './career-us-ak-hubs.js';
 import { assertUsGuCareerHubCatalog } from './career-us-gu-hubs.js';
 import { assertUsAsCareerHubCatalog } from './career-us-as-hubs.js';
 import { assertUsMpCareerHubCatalog } from './career-us-mp-hubs.js';
@@ -2284,7 +2285,7 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'KCMH', b: 'KCVG', weight: 1.4 },
   { a: 'KDAL', b: 'KDFW', weight: 1.7 },
   { a: 'KHOU', b: 'KIAH', weight: 1.7 },
-  { a: 'KPBI', b: 'KMIA', weight: 1.6 },
+  { a: 'KDJT', b: 'KMIA', weight: 1.6 },
   { a: 'KGSO', b: 'KCLT', weight: 1.5 },
   { a: 'KROC', b: 'KBUF', weight: 1.4 },
   { a: 'KROC', b: 'KEWR', weight: 1.4 },
@@ -2612,10 +2613,10 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'UACC', b: 'UAAA', weight: 2.0 },
   { a: 'UACC', b: 'UATE', weight: 1.6 },
   { a: 'UAII', b: 'UACC', weight: 1.5 },
-  { a: 'UTTT', b: 'UTSS', weight: 1.9 },
-  { a: 'UTSS', b: 'UTSB', weight: 1.7 },
-  { a: 'UTTT', b: 'UTNN', weight: 1.5 },
-  { a: 'UTSB', b: 'UTNN', weight: 1.4 },
+  { a: 'UZTT', b: 'UZSS', weight: 1.9 },
+  { a: 'UZSS', b: 'UZSB', weight: 1.7 },
+  { a: 'UZTT', b: 'UZNN', weight: 1.5 },
+  { a: 'UZSB', b: 'UZNN', weight: 1.4 },
   { a: 'UTAA', b: 'UTAK', weight: 1.8 },
   // Asia-6 Tajikistan / Kyrgyzstan domestic trunks
   { a: 'UTDD', b: 'UTDL', weight: 1.8 },
@@ -2818,6 +2819,9 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'ZGGG', b: 'ZSAM', weight: 1.6 },
   { a: 'ZGGG', b: 'ZPPP', weight: 1.5 },
   { a: 'PHNL', b: 'KLAX', weight: 1.9 },
+  { a: 'PANC', b: 'KSEA', weight: 1.8 },
+  { a: 'PANC', b: 'PAFA', weight: 1.6 },
+  { a: 'PANC', b: 'PAJN', weight: 1.5 },
   { a: 'PHNL', b: 'KSFO', weight: 1.8 },
   { a: 'NFFN', b: 'NVVV', weight: 1.55 },
   { a: 'NFFN', b: 'NWWW', weight: 1.5 },
@@ -4341,7 +4345,7 @@ export const FUEL_HUB_ICAOS = new Set([
   // Asia-5 Central Asia
   'UAAA',
   'UACC',
-  'UTTT',
+  'UZTT',
   'UTAA',
   // Asia-6 Tajikistan / Kyrgyzstan
   'UTDD',
@@ -4405,6 +4409,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'ZPPP',
   'ZYTL',
   'PHNL',
+  'PANC',
   'NFFN',
   'AYPY',
   'NWWW',
@@ -4516,7 +4521,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'OPDG',
   'WBGK',
   'VYME',
-  'UTFN',
+  'UZFN',
   'VGBR',
   // Oceania densify Wave A producers (~1 per 2–3 new hubs)
   'YARA',
@@ -6482,6 +6487,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertAwCareerHubCatalog();
   assertUsViCareerHubCatalog();
   assertUsHiCareerHubCatalog();
+  assertUsAkCareerHubCatalog();
   assertUsGuCareerHubCatalog();
   assertUsAsCareerHubCatalog();
   assertUsMpCareerHubCatalog();

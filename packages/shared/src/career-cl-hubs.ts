@@ -300,8 +300,15 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // Asia-3: old Bengaluru HAL VOBG → VOBL; Begumpet VOHY → VOHS
   VOBG: 'VOBL',
   VOHY: 'VOHS',
-  // Asia-5: Turkmenbashi is UTAK (not UTBK)
+  // Asia-5: Turkmenbashi is UTAK (not UTBK). Uzbekistan UT→UZ (2025-10-02).
   UTBK: 'UTAK',
+  UTTT: 'UZTT',
+  UTSS: 'UZSS',
+  UTSB: 'UZSB',
+  UTNN: 'UZNN',
+  UTFN: 'UZFN',
+  // Palm Beach stock ident is KDJT (KPBI no longer in MSFS scenery).
+  KPBI: 'KDJT',
   // Asia-6: Manas is UCFM (OurAirports ident UAFM); Osh is UCFO (ident UAFO)
   UAFM: 'UCFM',
   UAFO: 'UCFO',

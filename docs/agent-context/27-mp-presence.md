@@ -1,5 +1,7 @@
 # MP presence + contested scarcity
 
+- **Topbar Online chip (2026-10-10):** sintoma = chip Online na barra (contagem de sessões) ao lado de Company. Pedido = ocultar. Fix = o chip e o poll de 60s saíram do `App.tsx`. `GET /api/world/presence` e o roster da VA (Online/Offline) continuam.
+
 Atualizado 2026-09-20: **Online chip = accounts** — `onlineCount` contava `onlineByCompany.size` (cada membership: home + VA = 2 com 1 piloto). Fix: `onlineCount` = contas com session live; lista `online` continua por company. Tooltip: pilots ≤5 min.
 
 Atualizado 2026-09-19.

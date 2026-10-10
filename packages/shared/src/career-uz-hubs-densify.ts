@@ -19,7 +19,7 @@ type UzDensifyHub = {
 /** Wave C Asia densify (+1). */
 export const UZ_DENSIFY_HUBS: readonly UzDensifyHub[] = [
   {
-    icao: 'UTFN',
+    icao: 'UZFN',
     name: "Namangan International Airport",
     region: 'UZ-E',
     hubTier: 'spoke',

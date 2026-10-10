@@ -30,16 +30,53 @@ import { confirm, printSection, withPrompts, type AskFn } from './prompt.js';
 import { IpcClientError } from './ipc/types.js';
 import { isSimDownError } from './sim-session-health.js';
 
+const CAREER_HUBS_SCOPE_KEYWORDS = new Set([
+  'all',
+  'missing',
+  'gaps',
+  'bush',
+  'wizard',
+]);
+
 export type CareerHubsWizardOpts = {
   bridge: NamedPipeSimBridge;
   repoRoot: string;
-  /** Optional non-interactive scope: all | missing | icao */
+  /** Optional non-interactive scope: all | missing | gaps | icao */
   scope?: 'all' | 'missing' | string;
+  /** Explicit hub list. Every code is fetched; keywords are not mixed in. */
+  icaos?: string[];
   /** Skip prompts when scope is set. */
   yes?: boolean;
   /** Re-fetch even when an msfs_facility override already exists. */
   force?: boolean;
 };
+
+/** Positional args after `career-hubs`. One keyword stays a scope; several ICAOs are a list. */
+export function parseCareerHubsPositionals(positionals: readonly string[]): {
+  scope?: string;
+  icaos?: string[];
+} {
+  const args = positionals.map((arg) => arg.trim()).filter(Boolean);
+  if (args.length === 0) return {};
+  if (
+    args.length === 1 &&
+    CAREER_HUBS_SCOPE_KEYWORDS.has(args[0]!.toLowerCase())
+  ) {
+    return { scope: args[0]!.toLowerCase() };
+  }
+  const icaos: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of args) {
+    const code = raw.toUpperCase();
+    if (seen.has(code)) continue;
+    seen.add(code);
+    icaos.push(code);
+  }
+  return {
+    scope: icaos.length === 1 ? icaos[0] : 'icaos',
+    icaos,
+  };
+}
 
 type FacilityHit = {
   icao: string;
@@ -277,6 +314,18 @@ async function pickScope(
   if (opts.scope === 'gaps') {
     return filterHubsMissingRunways(listCareerHubIcaos());
   }
+  if (opts.icaos?.length) {
+    const codes = [
+      ...new Set(
+        opts.icaos.map((icao) => icao.trim().toUpperCase()).filter(Boolean),
+      ),
+    ];
+    const bad = codes.filter((icao) => !isCareerHubIcao(icao));
+    if (bad.length > 0) {
+      throw new Error(`${bad.join(', ')} is not a career hub`);
+    }
+    return codes;
+  }
   if (opts.scope && opts.scope !== 'wizard') {
     const code = opts.scope.trim().toUpperCase();
     if (!isCareerHubIcao(code)) {
@@ -319,6 +368,7 @@ export async function runCareerHubsWizard(
     let list = await pickScope(ask, opts);
     if (
       !opts.force &&
+      !opts.icaos?.length &&
       opts.scope !== 'missing' &&
       opts.scope !== 'gaps' &&
       list.length > 1

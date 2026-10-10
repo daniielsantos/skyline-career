@@ -30,7 +30,7 @@ const HOUSTON = {
   deskPickupHub: 'KIAH',
 };
 
-/** KPBI West Palm Beach */
+/** Palm Beach (KDJT) */
 const HOME = { lat: 26.683, lon: -80.096 };
 
 describe('pickDefaultPortId', () => {

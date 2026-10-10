@@ -7,6 +7,7 @@ import type { CommodityId, HubTier } from './types/career-economy.js';
 import { US_PR_CAREER_HUBS } from './career-us-pr-hubs.js';
 import { US_VI_CAREER_HUBS } from './career-us-vi-hubs.js';
 import { US_HI_CAREER_HUBS } from './career-us-hi-hubs.js';
+import { US_AK_CAREER_HUBS } from './career-us-ak-hubs.js';
 import { US_GU_CAREER_HUBS } from './career-us-gu-hubs.js';
 import { US_AS_CAREER_HUBS } from './career-us-as-hubs.js';
 import { US_MP_CAREER_HUBS } from './career-us-mp-hubs.js';
@@ -19,6 +20,15 @@ import {
   US_SE_DENSIFY_HUBS,
   US_W_DENSIFY_HUBS,
 } from './career-us-hubs-densify.js';
+import {
+  US_MT_SCHEDULED_HUBS,
+  US_MW_SCHEDULED_HUBS,
+  US_NE_SCHEDULED_HUBS,
+  US_SC_SCHEDULED_HUBS,
+  US_SCHEDULED_HUB_COUNT,
+  US_SE_SCHEDULED_HUBS,
+  US_W_SCHEDULED_HUBS,
+} from './career-us-scheduled-hubs.js';
 
 export type UsCareerRegion =
   | 'US-W'
@@ -30,6 +40,7 @@ export type UsCareerRegion =
   | 'US-PR'
   | 'US-VI'
   | 'US-HI'
+  | 'US-AK'
   | 'US-GU'
   | 'US-AS'
   | 'US-MP';
@@ -267,6 +278,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     ...drySpoke,
   },
   ...US_W_DENSIFY_HUBS,
+  ...US_W_SCHEDULED_HUBS,
 
   // ── US-MT (16 core + densify) ────────────────────────────────────────────
   {
@@ -418,6 +430,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     ...drySpoke,
   },
   ...US_MT_DENSIFY_HUBS,
+  ...US_MT_SCHEDULED_HUBS,
 
   // ── US-MW (21 core + densify) ────────────────────────────────────────────
   {
@@ -619,6 +632,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     ...drySpoke,
   },
   ...US_MW_DENSIFY_HUBS,
+  ...US_MW_SCHEDULED_HUBS,
 
   // ── US-SC (16 core + densify) ────────────────────────────────────────────
   {
@@ -772,6 +786,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     ...drySpoke,
   },
   ...US_SC_DENSIFY_HUBS,
+  ...US_SC_SCHEDULED_HUBS,
 
   // ── US-SE (16 core + densify + tour spokes) ──────────────────────────────
   {
@@ -928,6 +943,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     consume: { electronics: 0.9, machinery: 0.8 },
   },
   ...US_SE_DENSIFY_HUBS,
+  ...US_SE_SCHEDULED_HUBS,
 
   // ── US-NE (15 core + densify) ────────────────────────────────────────────
   {
@@ -1072,6 +1088,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     ...drySpoke,
   },
   ...US_NE_DENSIFY_HUBS,
+  ...US_NE_SCHEDULED_HUBS,
 
   // ── US bush-trip tour spokes (20) — K**** from Activities PLNs; normal spokes ──
   {
@@ -1289,6 +1306,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
   ...US_VI_CAREER_HUBS,
   // Hawaii (US state — region US-HI)
   ...US_HI_CAREER_HUBS,
+  ...US_AK_CAREER_HUBS,
   // Guam (US territory — region US-GU)
   ...US_GU_CAREER_HUBS,
   // American Samoa (US territory — region US-AS)
@@ -1297,7 +1315,12 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
   ...US_MP_CAREER_HUBS,
 ];
 
-export const US_CAREER_HUB_COUNT = 136 + US_DENSIFY_HUB_COUNT;
+export const US_CAREER_HUB_COUNT =
+  136 +
+  (US_HI_CAREER_HUBS.length - 1) +
+  US_AK_CAREER_HUBS.length +
+  US_DENSIFY_HUB_COUNT +
+  US_SCHEDULED_HUB_COUNT;
 
 function haversineNm(
   a: { lat: number; lon: number },

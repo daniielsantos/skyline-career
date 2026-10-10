@@ -32,10 +32,10 @@ const oasis = {
   >,
 };
 
-/** 4 curated Uzbekistan hubs. Tashkent is UTTT (not UTNN Nukus). */
+/** 4 curated Uzbekistan hubs. Tashkent is UZTT (not UZNN Nukus). */
 export const UZ_CAREER_HUBS: readonly UzCareerHubDef[] = [
   {
-    icao: 'UTTT',
+    icao: 'UZTT',
     name: 'Tashkent International',
     region: 'UZ-E',
     hubTier: 'major',
@@ -45,7 +45,7 @@ export const UZ_CAREER_HUBS: readonly UzCareerHubDef[] = [
     consume: { perishables: 1.2, supplies: 1.15, general: 1.05 },
   },
   {
-    icao: 'UTSS',
+    icao: 'UZSS',
     name: 'Samarkand International',
     region: 'UZ-E',
     hubTier: 'regional',
@@ -55,7 +55,7 @@ export const UZ_CAREER_HUBS: readonly UzCareerHubDef[] = [
     consume: { electronics: 1.0, machinery: 0.95, fuel: 1.1 },
   },
   {
-    icao: 'UTSB',
+    icao: 'UZSB',
     name: 'Bukhara International',
     region: 'UZ-W',
     hubTier: 'regional',
@@ -65,7 +65,7 @@ export const UZ_CAREER_HUBS: readonly UzCareerHubDef[] = [
     consume: { electronics: 0.95, supplies: 1.1, fuel: 1.1 },
   },
   {
-    icao: 'UTNN',
+    icao: 'UZNN',
     name: 'Nukus International',
     region: 'UZ-W',
     hubTier: 'spoke',
@@ -94,14 +94,14 @@ export function assertUzCareerHubCatalog(): void {
       `UZ_CAREER_HUBS length ${UZ_CAREER_HUBS.length} !== ${UZ_CAREER_HUB_COUNT}`,
     );
   }
-  if (!UZ_CAREER_HUBS.some((h) => h.icao === 'UTTT' && h.hubTier === 'major')) {
-    throw new Error('UZ catalog must include major UTTT (Tashkent)');
+  if (!UZ_CAREER_HUBS.some((h) => h.icao === 'UZTT' && h.hubTier === 'major')) {
+    throw new Error('UZ catalog must include major UZTT (Tashkent)');
   }
-  if (!UZ_CAREER_HUBS.some((h) => h.icao === 'UTSS')) {
-    throw new Error('UZ catalog must include UTSS Samarkand');
+  if (!UZ_CAREER_HUBS.some((h) => h.icao === 'UZSS')) {
+    throw new Error('UZ catalog must include UZSS Samarkand');
   }
-  const nukus = UZ_CAREER_HUBS.find((h) => h.icao === 'UTNN');
+  const nukus = UZ_CAREER_HUBS.find((h) => h.icao === 'UZNN');
   if (nukus?.hubTier === 'major') {
-    throw new Error('UTNN Nukus must not be the Tashkent major (use UTTT)');
+    throw new Error('UZNN Nukus must not be the Tashkent major (use UZTT)');
   }
 }

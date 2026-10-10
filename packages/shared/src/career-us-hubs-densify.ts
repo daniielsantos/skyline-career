@@ -25,7 +25,7 @@ const dryRegional = {
   consume: { perishables: 0.95, machinery: 0.9 },
 } as const;
 
-/** US-MW densify (+32). */
+/** US-MW densify (+34). */
 export const US_MW_DENSIFY_HUBS: readonly DensifyHub[] = [
   {
     icao: 'KMDW',
@@ -319,9 +319,27 @@ export const US_MW_DENSIFY_HUBS: readonly DensifyHub[] = [
     lon: -92.2196,
     ...drySpoke,
   },
+  {
+    icao: 'KFOE',
+    name: 'Topeka Regional',
+    region: 'US-MW',
+    hubTier: 'spoke',
+    lat: 38.9509,
+    lon: -95.6636,
+    ...drySpoke,
+  },
+  {
+    icao: 'KMKC',
+    name: 'Kansas City Downtown',
+    region: 'US-MW',
+    hubTier: 'spoke',
+    lat: 39.1232,
+    lon: -94.5928,
+    ...drySpoke,
+  },
 ];
 
-/** US-SC densify (+25). */
+/** US-SC densify (+28). */
 export const US_SC_DENSIFY_HUBS: readonly DensifyHub[] = [
   {
     icao: 'KDAL',
@@ -554,12 +572,39 @@ export const US_SC_DENSIFY_HUBS: readonly DensifyHub[] = [
     lon: -88.7699,
     ...drySpoke,
   },
+  {
+    icao: 'KCLL',
+    name: 'College Station Easterwood',
+    region: 'US-SC',
+    hubTier: 'spoke',
+    lat: 30.5886,
+    lon: -96.3638,
+    ...drySpoke,
+  },
+  {
+    icao: 'KLRD',
+    name: 'Laredo International',
+    region: 'US-SC',
+    hubTier: 'spoke',
+    lat: 27.5438,
+    lon: -99.4616,
+    ...drySpoke,
+  },
+  {
+    icao: 'KNEW',
+    name: 'New Orleans Lakefront',
+    region: 'US-SC',
+    hubTier: 'spoke',
+    lat: 30.0424,
+    lon: -90.0283,
+    ...drySpoke,
+  },
 ];
 
-/** US-SE densify (+26). */
+/** US-SE densify (+28). */
 export const US_SE_DENSIFY_HUBS: readonly DensifyHub[] = [
   {
-    icao: 'KPBI',
+    icao: 'KDJT',
     name: 'Palm Beach International',
     region: 'US-SE',
     hubTier: 'regional',
@@ -794,9 +839,27 @@ export const US_SE_DENSIFY_HUBS: readonly DensifyHub[] = [
     lon: -80.2281,
     ...drySpoke,
   },
+  {
+    icao: 'KPGD',
+    name: 'Punta Gorda',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 26.9202,
+    lon: -81.9905,
+    ...drySpoke,
+  },
+  {
+    icao: 'KAPF',
+    name: 'Naples Municipal',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 26.1526,
+    lon: -81.7753,
+    ...drySpoke,
+  },
 ];
 
-/** US-NE densify (+24). */
+/** US-NE densify (+36). */
 export const US_NE_DENSIFY_HUBS: readonly DensifyHub[] = [
   {
     icao: 'KROC',
@@ -1015,9 +1078,117 @@ export const US_NE_DENSIFY_HUBS: readonly DensifyHub[] = [
     lon: -70.8233,
     ...drySpoke,
   },
+  {
+    icao: 'KLGA',
+    name: 'New York LaGuardia',
+    region: 'US-NE',
+    hubTier: 'regional',
+    lat: 40.7772,
+    lon: -73.8726,
+    ...dryRegional,
+  },
+  {
+    icao: 'KTEB',
+    name: 'Teterboro',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 40.8501,
+    lon: -74.0608,
+    ...drySpoke,
+  },
+  {
+    icao: 'KACK',
+    name: 'Nantucket Memorial',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 41.2531,
+    lon: -70.0602,
+    ...drySpoke,
+  },
+  {
+    icao: 'KMVY',
+    name: "Martha's Vineyard",
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 41.3931,
+    lon: -70.6143,
+    ...drySpoke,
+  },
+  {
+    icao: 'KHYA',
+    name: 'Cape Cod Gateway',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 41.6693,
+    lon: -70.2804,
+    ...drySpoke,
+  },
+  {
+    icao: 'KBHB',
+    name: 'Bar Harbor',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 44.45,
+    lon: -68.3615,
+    ...drySpoke,
+  },
+  {
+    icao: 'KHVN',
+    name: 'Tweed New Haven',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 41.2629,
+    lon: -72.8877,
+    ...drySpoke,
+  },
+  {
+    icao: 'KBDR',
+    name: 'Sikorsky Memorial',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 41.1635,
+    lon: -73.1262,
+    ...drySpoke,
+  },
+  {
+    icao: 'KTTN',
+    name: 'Trenton Mercer',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 40.2767,
+    lon: -74.8135,
+    ...drySpoke,
+  },
+  {
+    icao: 'KUNV',
+    name: 'State College Regional',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 40.8494,
+    lon: -77.8485,
+    ...drySpoke,
+  },
+  {
+    icao: 'KIAG',
+    name: 'Niagara Falls International',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 43.1073,
+    lon: -78.9462,
+    ...drySpoke,
+  },
+  {
+    icao: 'KELM',
+    name: 'Elmira Corning',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 42.1599,
+    lon: -76.8916,
+    ...drySpoke,
+  },
 ];
 
-/** US-W densify (+22). CA/PNW commercial only. */
+/** US-W densify (+26). CA/PNW commercial only. */
 export const US_W_DENSIFY_HUBS: readonly DensifyHub[] = [
   {
     icao: 'KSBA',
@@ -1225,9 +1396,47 @@ export const US_W_DENSIFY_HUBS: readonly DensifyHub[] = [
     lon: -121.733,
     ...drySpoke,
   },
+  {
+    icao: 'KBFI',
+    name: 'Boeing Field',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 47.527,
+    lon: -122.2999,
+    produce: { machinery: 1.2, electronics: 1.1, general: 1.05 },
+    consume: { perishables: 0.95, supplies: 0.95 },
+  },
+  {
+    icao: 'KVNY',
+    name: 'Van Nuys',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 34.2098,
+    lon: -118.49,
+    ...drySpoke,
+  },
+  {
+    icao: 'KCRQ',
+    name: 'McClellan-Palomar',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 33.1283,
+    lon: -117.28,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSNS',
+    name: 'Salinas Municipal',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 36.6628,
+    lon: -121.606,
+    produce: { perishables: 1.25, general: 1.1, supplies: 1.0 },
+    consume: { electronics: 0.85, machinery: 0.85 },
+  },
 ];
 
-/** US-MT densify (+24). Rockies / SW. */
+/** US-MT densify (+35). Rockies / SW. */
 export const US_MT_DENSIFY_HUBS: readonly DensifyHub[] = [
   {
     icao: 'KGTF',
@@ -1434,6 +1643,105 @@ export const US_MT_DENSIFY_HUBS: readonly DensifyHub[] = [
     hubTier: 'spoke',
     lat: 36.7412,
     lon: -108.23,
+    ...drySpoke,
+  },
+  {
+    icao: 'KTEX',
+    name: 'Telluride Regional',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 37.9538,
+    lon: -107.908,
+    ...drySpoke,
+  },
+  {
+    icao: 'KHDN',
+    name: 'Yampa Valley',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 40.4812,
+    lon: -107.218,
+    ...drySpoke,
+  },
+  {
+    icao: 'KGUC',
+    name: 'Gunnison Crested Butte',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 38.5347,
+    lon: -106.9346,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSUN',
+    name: 'Friedman Memorial',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 43.5044,
+    lon: -114.296,
+    ...drySpoke,
+  },
+  {
+    icao: 'KCOD',
+    name: 'Yellowstone Regional',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 44.5202,
+    lon: -109.024,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSHR',
+    name: 'Sheridan County',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 44.7692,
+    lon: -106.98,
+    ...drySpoke,
+  },
+  {
+    icao: 'KOGD',
+    name: 'Ogden Hinckley',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 41.1959,
+    lon: -112.012,
+    ...drySpoke,
+  },
+  {
+    icao: 'KPGA',
+    name: 'Page Municipal',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 36.9242,
+    lon: -111.4477,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSEZ',
+    name: 'Sedona',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 34.8486,
+    lon: -111.788,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSDL',
+    name: 'Scottsdale',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 33.6229,
+    lon: -111.911,
+    ...drySpoke,
+  },
+  {
+    icao: 'KDVT',
+    name: 'Phoenix Deer Valley',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 33.6883,
+    lon: -112.083,
     ...drySpoke,
   },
 ];

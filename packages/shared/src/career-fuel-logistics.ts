@@ -308,6 +308,7 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'NZ-W': ['NZ-N', 'NZ-S'],
   // Asia-15 Pacific hinge (islands — no road to the mainland)
   'US-HI': [],
+  'US-AK': [],
   'FJ-W': [],
   'PG-S': [],
   'NC-S': [],
@@ -908,6 +909,25 @@ function fuelFleetNeedsTopUp(trucks: FuelTruck[]): boolean {
   return false;
 }
 
+/**
+ * Alaska has no road neighbor, so only a truck homed in US-AK can deliver
+ * Jet-A there. A full fleet seeded before the region existed never grows one.
+ */
+function ensureAlaskaHomeTruck(world: CareerEconomyWorld): void {
+  const trucks = world.fuelTrucks;
+  if (!trucks?.length) return;
+  if (trucks.some((t) => t.homeRegion === 'US-AK')) return;
+  if (!world.airports.some((a) => a.region === 'US-AK')) return;
+  const counts = new Map<string, number>();
+  for (const truck of trucks) {
+    counts.set(truck.homeRegion, (counts.get(truck.homeRegion) ?? 0) + 1);
+  }
+  const donor = trucks.find(
+    (t) => t.status === 'idle' && (counts.get(t.homeRegion) ?? 0) > 1,
+  );
+  if (donor) donor.homeRegion = 'US-AK';
+}
+
 /** Ensure save has a fuel-truck fleet; seeds / tops up composition. */
 export function ensureFuelTruckFleet(world: CareerEconomyWorld): void {
   if (!Array.isArray(world.fuelHauls)) {
@@ -916,14 +936,19 @@ export function ensureFuelTruckFleet(world: CareerEconomyWorld): void {
   if (!Array.isArray(world.fuelTrucks) || world.fuelTrucks.length === 0) {
     const regions = world.airports.map((a) => a.region);
     world.fuelTrucks = seedFuelTruckFleet({ seed: world.seed, regions });
+    ensureAlaskaHomeTruck(world);
     return;
   }
   // Hot path: fleet already at composition — skip O(airports) region scan.
-  if (!fuelFleetNeedsTopUp(world.fuelTrucks)) return;
+  if (!fuelFleetNeedsTopUp(world.fuelTrucks)) {
+    ensureAlaskaHomeTruck(world);
+    return;
+  }
   topUpFuelTruckFleet(
     world,
     world.airports.map((a) => a.region),
   );
+  ensureAlaskaHomeTruck(world);
 }
 
 function airportByIcaoMap(

@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **170a5584** / desktop **0.3.492** shipped: Add the scheduled hubs still missing in Latin America, Canada, and the Caribbean, and label the sidebar flight status. Release: [v0.3.492](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.492).
+
+
 `main` **a6a88164** / desktop **0.3.491** shipped: Add the remaining scheduled US hubs, including Alaska and Hawaii, and use the MSFS idents for Palm Beach and Uzbekistan. Release: [v0.3.491](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.491).
 
 

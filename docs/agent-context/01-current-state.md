@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **74fe953e** / desktop **0.3.490** shipped: Keep large and XL freight off hops under 40 nm, with one short contract when the origin has no farther domestic airport. Release: [v0.3.490](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.490).
+
+
 `main` **a1e51549** / desktop **0.3.489** shipped: Persist pilot flight hours on the company save so a reload does not wipe the Hangar counter. Release: [v0.3.489](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.489).
 
 

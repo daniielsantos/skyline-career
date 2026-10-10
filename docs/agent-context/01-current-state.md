@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **772c1904** / desktop **0.3.493** shipped: Add the remaining scheduled Western Europe hubs, including Gibraltar. Release: [v0.3.493](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.493).
+
+
 `main` **170a5584** / desktop **0.3.492** shipped: Add the scheduled hubs still missing in Latin America, Canada, and the Caribbean, and label the sidebar flight status. Release: [v0.3.492](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.492).
 
 

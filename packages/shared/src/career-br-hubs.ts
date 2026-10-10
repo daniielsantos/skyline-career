@@ -719,11 +719,11 @@ export function assertBrCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<BrCareerRegion, number> = {
-    'BR-SE': 21,
-    'BR-S': 18,
-    'BR-NE': 22,
-    'BR-N': 19,
-    'BR-CO': 17,
+    'BR-SE': 28,
+    'BR-S': 20,
+    'BR-NE': 24,
+    'BR-N': 21,
+    'BR-CO': 19,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

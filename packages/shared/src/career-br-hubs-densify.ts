@@ -1,5 +1,5 @@
 /**
- * Brazil densify batch — commercial SB* airports only (MSFS + SimBrief).
+ * Brazil densify batch — commercial airports with scheduled service (MSFS + SimBrief).
  * Merged into BR_CAREER_HUBS. No new bush strips.
  */
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -35,7 +35,7 @@ const dryRegional = {
   consume: { electronics: 0.95, machinery: 0.9 },
 } as const;
 
-/** BR-SE densify (+8). Santos / GRU / GIG catchment. */
+/** BR-SE densify (+15). Santos / GRU / GIG catchment. */
 export const BR_SE_DENSIFY_HUBS: readonly BrDensifyHub[] = [
   {
     icao: 'SBRJ',
@@ -113,9 +113,72 @@ export const BR_SE_DENSIFY_HUBS: readonly BrDensifyHub[] = [
     produce: { machinery: 1.25, supplies: 1.15, general: 1.05 },
     consume: { electronics: 0.9, perishables: 0.9 },
   },
+  {
+    icao: 'SBAE',
+    name: 'Bauru',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -22.1608,
+    lon: -49.0703,
+    ...drySpoke,
+  },
+  {
+    icao: 'SBAQ',
+    name: 'Araraquara',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -21.812,
+    lon: -48.133,
+    ...drySpoke,
+  },
+  {
+    icao: 'SBAX',
+    name: 'Araxá',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -19.5632,
+    lon: -46.9604,
+    ...agriSpoke,
+  },
+  {
+    icao: 'SBGV',
+    name: 'Governador Valadares',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -18.8959,
+    lon: -41.9829,
+    ...drySpoke,
+  },
+  {
+    icao: 'SBIP',
+    name: 'Ipatinga',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -19.4707,
+    lon: -42.4876,
+    ...drySpoke,
+  },
+  {
+    icao: 'SBMK',
+    name: 'Montes Claros',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -16.7069,
+    lon: -43.8189,
+    ...drySpoke,
+  },
+  {
+    icao: 'SBZM',
+    name: 'Juiz de Fora',
+    region: 'BR-SE',
+    hubTier: 'spoke',
+    lat: -21.5131,
+    lon: -43.1731,
+    ...drySpoke,
+  },
 ];
 
-/** BR-S densify (+7). Paranaguá / Rio Grande catchment. */
+/** BR-S densify (+9). Paranaguá / Rio Grande catchment. */
 export const BR_S_DENSIFY_HUBS: readonly BrDensifyHub[] = [
   {
     icao: 'SBSM',
@@ -180,9 +243,27 @@ export const BR_S_DENSIFY_HUBS: readonly BrDensifyHub[] = [
     lon: -50.2815,
     ...agriSpoke,
   },
+  {
+    icao: 'SBMG',
+    name: 'Maringá',
+    region: 'BR-S',
+    hubTier: 'spoke',
+    lat: -23.4761,
+    lon: -52.0162,
+    ...agriSpoke,
+  },
+  {
+    icao: 'SSZW',
+    name: 'Ponta Grossa',
+    region: 'BR-S',
+    hubTier: 'spoke',
+    lat: -25.1845,
+    lon: -50.1438,
+    ...agriSpoke,
+  },
 ];
 
-/** BR-NE densify (+8). Suape + interior NE. */
+/** BR-NE densify (+10). Suape + interior NE. */
 export const BR_NE_DENSIFY_HUBS: readonly BrDensifyHub[] = [
   {
     icao: 'SBKG',
@@ -258,9 +339,27 @@ export const BR_NE_DENSIFY_HUBS: readonly BrDensifyHub[] = [
     lon: -39.2531,
     ...drySpoke,
   },
+  {
+    icao: 'SBJE',
+    name: 'Jericoacoara',
+    region: 'BR-NE',
+    hubTier: 'spoke',
+    lat: -2.9064,
+    lon: -40.3573,
+    ...drySpoke,
+  },
+  {
+    icao: 'SBPB',
+    name: 'Parnaíba',
+    region: 'BR-NE',
+    hubTier: 'spoke',
+    lat: -2.8937,
+    lon: -41.732,
+    ...drySpoke,
+  },
 ];
 
-/** BR-N densify (+6 network). Manaus / Belém feeders — no bush. */
+/** BR-N densify (+8 network). Manaus / Belém feeders — no bush. */
 export const BR_N_DENSIFY_HUBS: readonly BrDensifyHub[] = [
   {
     icao: 'SBCJ',
@@ -319,9 +418,27 @@ export const BR_N_DENSIFY_HUBS: readonly BrDensifyHub[] = [
     lon: -61.8465,
     ...amazonSpoke,
   },
+  {
+    icao: 'SBTF',
+    name: 'Tefé',
+    region: 'BR-N',
+    hubTier: 'spoke',
+    lat: -3.3829,
+    lon: -64.7241,
+    ...amazonSpoke,
+  },
+  {
+    icao: 'SBUA',
+    name: 'São Gabriel da Cachoeira',
+    region: 'BR-N',
+    hubTier: 'spoke',
+    lat: -0.1484,
+    lon: -66.9855,
+    ...amazonSpoke,
+  },
 ];
 
-/** BR-CO densify (+6). Cerrado / agri. */
+/** BR-CO densify (+8). Cerrado / agri. */
 export const BR_CO_DENSIFY_HUBS: readonly BrDensifyHub[] = [
   {
     icao: 'SBAN',
@@ -376,6 +493,24 @@ export const BR_CO_DENSIFY_HUBS: readonly BrDensifyHub[] = [
     hubTier: 'spoke',
     lat: -10.7194,
     lon: -48.3997,
+    ...agriSpoke,
+  },
+  {
+    icao: 'SBPP',
+    name: 'Ponta Porã',
+    region: 'BR-CO',
+    hubTier: 'spoke',
+    lat: -22.5496,
+    lon: -55.7026,
+    ...agriSpoke,
+  },
+  {
+    icao: 'SWGN',
+    name: 'Araguaína',
+    region: 'BR-CO',
+    hubTier: 'spoke',
+    lat: -7.2279,
+    lon: -48.2405,
     ...agriSpoke,
   },
 ];

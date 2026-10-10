@@ -31,7 +31,7 @@ const citySpoke = {
   consume: { perishables: 1.1, machinery: 0.9 },
 } as const;
 
-/** CO densify (+26) → 42 total. SKPV remains Providencia (not Riohacha). */
+/** CO densify (+28) → 44 total. SKPV remains Providencia (not Riohacha). */
 export const CO_DENSIFY_HUBS: readonly CoDensifyHub[] = [
   {
     icao: 'SKMD',
@@ -269,6 +269,24 @@ export const CO_DENSIFY_HUBS: readonly CoDensifyHub[] = [
     hubTier: 'spoke',
     lat: 2.5797,
     lon: -72.6394,
+    ...agroSpoke,
+  },
+  {
+    icao: 'SKSV',
+    name: 'San Vicente del Caguan Eduardo Falla Solano',
+    region: 'CO-C',
+    hubTier: 'spoke',
+    lat: 2.1522,
+    lon: -74.7663,
+    ...agroSpoke,
+  },
+  {
+    icao: 'SKTM',
+    name: 'Tame Gustavo Vargas',
+    region: 'CO-C',
+    hubTier: 'spoke',
+    lat: 6.4511,
+    lon: -71.7603,
     ...agroSpoke,
   },
 ];

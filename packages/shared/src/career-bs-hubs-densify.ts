@@ -21,7 +21,7 @@ const islandSpoke = {
   consume: { electronics: 0.9, machinery: 0.85, fuel: 0.9 },
 } as const;
 
-/** BS densify (+9) → 14 total. */
+/** BS densify (+17) → 22 total. */
 export const BS_DENSIFY_HUBS: readonly BsDensifyHub[] = [
   {
     icao: 'MYAM',
@@ -103,6 +103,78 @@ export const BS_DENSIFY_HUBS: readonly BsDensifyHub[] = [
     hubTier: 'spoke',
     lat: 20.975,
     lon: -73.6669,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYAK',
+    name: 'Congo Town',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 24.1588,
+    lon: -77.59,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYAN',
+    name: 'San Andros',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 25.0539,
+    lon: -78.0489,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYAP',
+    name: 'Spring Point',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 22.4419,
+    lon: -73.9707,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYBC',
+    name: 'Chub Cay',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 25.4171,
+    lon: -77.8808,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYCA',
+    name: "Arthur's Town",
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 24.6286,
+    lon: -75.6713,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYCB',
+    name: 'New Bight',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 24.3153,
+    lon: -75.4525,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYCI',
+    name: 'Colonel Hill',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 22.7455,
+    lon: -74.1824,
+    ...islandSpoke,
+  },
+  {
+    icao: 'MYMM',
+    name: 'Mayaguana',
+    region: 'BS-C',
+    hubTier: 'spoke',
+    lat: 22.3795,
+    lon: -73.0135,
     ...islandSpoke,
   },
 ];

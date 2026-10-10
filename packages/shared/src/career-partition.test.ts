@@ -67,6 +67,7 @@ describe('career partition', () => {
       'BJ',
       'BN',
       'BO',
+      'BQ',
       'BR',
       'BS',
       'BT',
@@ -137,8 +138,10 @@ describe('career partition', () => {
         'KG',
         'KI',
         'KM',
+        'KN',
         'KR',
       'KW',
+      'KY',
       'KZ',
       'LB',
       'LC',
@@ -207,6 +210,7 @@ describe('career partition', () => {
       'SX',
       'SY',
       'SZ',
+      'TC',
       'TD',
       'TG',
       'TH',
@@ -223,7 +227,9 @@ describe('career partition', () => {
       'US',
       'UY',
       'UZ',
+      'VC',
       'VE',
+      'VG',
         'VN',
         'VU',
         'WS',
@@ -265,7 +271,7 @@ describe('career partition', () => {
     );
     assert.deepEqual(
       usRegions,
-      new Set(['US-AS', 'US-GU', 'US-HI', 'US-MP', 'US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
+      new Set(['US-AK', 'US-AS', 'US-GU', 'US-HI', 'US-MP', 'US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
     );
   });
 

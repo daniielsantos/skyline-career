@@ -246,7 +246,10 @@ import {
 import { LiveAircraftIdentify } from './LiveAircraftIdentify';
 import { marketCountryLabel } from './market-country-label';
 import { BrandMark } from './BrandMark';
-import { SidebarFlightStrip } from './SidebarFlightStrip';
+import {
+  SidebarFlightStrip,
+  sidebarFlightStatusLabel,
+} from './SidebarFlightStrip';
 import { StagingLotReason } from './StagingLotReason';
 import { DispatchFlightSummary } from './DispatchFlightSummary';
 import {
@@ -1213,6 +1216,18 @@ function regionLabel(region: string): string {
       return 'Sint Maarten';
     case 'AW-C':
       return 'Aruba';
+    case 'KY-C':
+      return 'Cayman Islands';
+    case 'TC-C':
+      return 'Turks and Caicos';
+    case 'KN-C':
+      return 'Saint Kitts and Nevis';
+    case 'VC-C':
+      return 'Saint Vincent and the Grenadines';
+    case 'BQ-C':
+      return 'Caribbean Netherlands';
+    case 'VG-C':
+      return 'British Virgin Islands';
     case 'PT-N':
       return 'Portugal — North';
     case 'PT-C':
@@ -14857,15 +14872,22 @@ export function App() {
             label="Active flight"
             originIcao={activeMission.originIcao}
             destIcao={activeMission.destIcao}
+            status={activeMission.status}
+            statusLabel={sidebarFlightStatusLabel(
+              activeMission.status,
+              watch?.running && watch.missionId === activeMission.id
+                ? watch.phase
+                : null,
+            )}
             detail={
               activeTourOnDispatch
-                ? `Tour L${activeTourOnDispatch.legIndex}/${activeTourOnDispatch.legCount} · ${activeMission.status.replace(/_/g, ' ')}${
+                ? `Tour L${activeTourOnDispatch.legIndex}/${activeTourOnDispatch.legCount}${
                     activeTourOnDispatch.nextOrigin &&
                     activeTourOnDispatch.nextDest
                       ? ` · next ${activeTourOnDispatch.nextOrigin}→${activeTourOnDispatch.nextDest}`
                       : ''
                   }`
-                : activeMission.status.replace(/_/g, ' ')
+                : undefined
             }
             busy={busy}
             onOpen={() => selectTab('staging')}
@@ -14962,7 +14984,13 @@ export function App() {
             label="Crew airborne"
             originIcao={crewAirborneMission.originIcao}
             destIcao={crewAirborneMission.destIcao}
-            detail="In flight"
+            status="in_flight"
+            statusLabel={sidebarFlightStatusLabel(
+              'in_flight',
+              watch?.running && watch.missionId === crewAirborneMission.id
+                ? watch.phase
+                : null,
+            )}
             busy={busy}
             onOpen={() => selectTab('staging')}
           />

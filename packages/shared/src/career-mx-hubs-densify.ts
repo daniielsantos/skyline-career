@@ -36,7 +36,7 @@ const petroSpoke = {
   consume: { electronics: 0.85, perishables: 0.85 },
 } as const;
 
-/** MX densify (+37) → 83 total. MMDM dropped — absent in stock MSFS. */
+/** MX densify (+38) → 84 total. MMDM dropped — absent in stock MSFS. */
 export const MX_DENSIFY_HUBS: readonly MxDensifyHub[] = [
   {
     icao: 'MMMZ',
@@ -370,6 +370,15 @@ export const MX_DENSIFY_HUBS: readonly MxDensifyHub[] = [
     lat: 19.5996,
     lon: -103.371,
     ...agroSpoke,
+  },
+  {
+    icao: 'MMTL',
+    name: 'Tulum Felipe Carrillo Puerto',
+    region: 'MX-Y',
+    hubTier: 'regional',
+    lat: 20.1721,
+    lon: -87.6603,
+    ...city,
   },
 ];
 

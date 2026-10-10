@@ -484,6 +484,41 @@ body {
   flex: 0 0 auto;
 }
 
+.sidebar-flight-strip-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  max-width: 100%;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--strip-accent);
+}
+
+.sidebar-flight-strip-status-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+  flex: 0 0 auto;
+}
+
+.sidebar-flight-strip-status--accepted {
+  color: var(--muted);
+}
+
+.sidebar-flight-strip-status--dispatched {
+  color: var(--accent);
+}
+
+.sidebar-flight-strip-status--in_flight {
+  color: var(--ok);
+}
+
 .sidebar-flight-strip-detail {
   margin: 0;
   font-size: 0.74rem;

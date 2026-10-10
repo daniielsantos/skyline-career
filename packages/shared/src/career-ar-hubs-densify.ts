@@ -31,7 +31,7 @@ const tourismRegional = {
   consume: { electronics: 1.0, machinery: 0.9 },
 } as const;
 
-/** AR densify (+29) → 70 total. Skip Coronel Suarez SAZC — stock MSFS maps SAZC to Zarate. */
+/** AR densify (+31) → 72 total. Skip Coronel Suarez SAZC — stock MSFS maps SAZC to Zarate. */
 export const AR_DENSIFY_HUBS: readonly ArDensifyHub[] = [
   {
     icao: 'SARI',
@@ -299,6 +299,24 @@ export const AR_DENSIFY_HUBS: readonly ArDensifyHub[] = [
     lat: -38.9755,
     lon: -70.1136,
     ...drySpoke,
+  },
+  {
+    icao: 'SANL',
+    name: 'La Rioja Capitan Almonacid',
+    region: 'AR-CO',
+    hubTier: 'spoke',
+    lat: -29.3816,
+    lon: -66.7958,
+    ...agroSpoke,
+  },
+  {
+    icao: 'SANR',
+    name: 'Termas de Rio Hondo',
+    region: 'AR-NO',
+    hubTier: 'spoke',
+    lat: -27.4966,
+    lon: -64.936,
+    ...tourismRegional,
   },
 ];
 

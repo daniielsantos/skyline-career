@@ -215,8 +215,8 @@ export function assertVeCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<VeCareerRegion, number> = {
-    'VE-C': 20,
-    'VE-W': 11,
+    'VE-C': 21,
+    'VE-W': 12,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

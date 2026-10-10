@@ -26,7 +26,7 @@ const MISSION_STATUS_LABEL: Record<string, string> = {
   failed: 'Failed',
 };
 
-function formatWatchPhaseLabel(phase: string | null | undefined): string {
+export function formatWatchPhaseLabel(phase: string | null | undefined): string {
   if (!phase) return '—';
   return FLIGHT_PHASE_LABEL[phase] ?? phase;
 }

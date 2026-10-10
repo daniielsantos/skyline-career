@@ -216,7 +216,7 @@ export function assertPeCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<PeCareerRegion, number> = {
-    'PE-C': 22,
+    'PE-C': 24,
     'PE-S': 10,
   };
   for (const [region, n] of Object.entries(expected)) {

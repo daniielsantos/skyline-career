@@ -1,7 +1,7 @@
 /**
  * Ecuador densify — commercial SE* airports (MSFS + SimBrief).
  * Merged into EC_CAREER_HUBS. No bush strips.
- * Keep Quito as SEQU only (do not add SEQM).
+ * Quito is SEQM (Tababela). SEQU in MSFS is the old in-town field.
  */
 import type { CommodityId, HubTier } from './types/career-economy.js';
 import type { EcCareerRegion } from './career-ec-hubs.js';

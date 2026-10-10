@@ -177,7 +177,7 @@ export function assertBoCareerHubCatalog(): void {
   }
   const expected: Record<BoCareerRegion, number> = {
     'BO-W': 7,
-    'BO-E': 14,
+    'BO-E': 17,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

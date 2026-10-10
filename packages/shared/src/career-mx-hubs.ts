@@ -567,7 +567,7 @@ export function assertMxCareerHubCatalog(): void {
     'MX-N': 32,
     'MX-C': 25,
     'MX-S': 17,
-    'MX-Y': 9,
+    'MX-Y': 10,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

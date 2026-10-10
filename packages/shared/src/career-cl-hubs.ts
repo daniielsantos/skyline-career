@@ -309,6 +309,10 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   UTFN: 'UZFN',
   // Palm Beach stock ident is KDJT (KPBI no longer in MSFS scenery).
   KPBI: 'KDJT',
+  // Ponta Grossa stock ident is SSZW. SBPG in MSFS is Novo Planalto (GO).
+  SBPG: 'SSZW',
+  // Quito commercial field is SEQM. SEQU in MSFS is the old in-town airport.
+  SEQU: 'SEQM',
   // Asia-6: Manas is UCFM (OurAirports ident UAFM); Osh is UCFO (ident UAFO)
   UAFM: 'UCFM',
   UAFO: 'UCFO',
@@ -345,15 +349,16 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SARL: 'SATR', // Reconquista
   SAHR: 'SAZW', // Cutral Co
   // SAHS is Rincon de los Sauces (OA) — do not map to SANR (Termas).
-  // SANR→SANE migrates mis-seeded Santiago; Termas densify later (do not seed
-  // Termas as SANR while SANR→SANE remains).
   SAOS: 'SAAV', // Sauce Viejo (already seeded)
   // San Luis is live SAOU; San Rafael is live SAMR. Do NOT remap SAOU→SAMR —
   // that collapsed SAOU↔SAMR lots into SAMR→SAMR (0 nm) on every migrate.
-  // Legacy San Luis mis-seed SANL still migrates to SAOU.
-  SANL: 'SAOU', // San Luis Ojeda (stock MSFS SANL is La Rioja)
+  // La Rioja is live SANL. A leftover San Luis row still saved as SANL
+  // migrates to SAOU only when it sits on San Luis, not on La Rioja.
+  SANL: 'SAOU',
   SAMA: 'SAMM', // Malargüe (stock MSFS SAMA is General Alvear)
-  SANR: 'SANE', // Santiago del Estero (stock MSFS SANR is Termas)
+  // Termas de Río Hondo is live SANR. A leftover Santiago row saved as SANR
+  // migrates to SANE only when it sits on Santiago.
+  SANR: 'SANE',
   SCPQ: 'SCGZ', // Puerto Williams (stock MSFS SCPQ is Mocopulli)
   // SAHC Coronel Suarez / SAZC dropped — stock MSFS SAZC is Zarate (~242 nm)
   // SYKM/SYKA Kaieteur dropped — no MSFS facility coords

@@ -1,6 +1,6 @@
 /**
  * Dominican Republic densify — commercial MD* airports (MSFS + SimBrief).
- * Merged into DO_CAREER_HUBS. No bush; skip MDJB.
+ * Merged into DO_CAREER_HUBS. No bush strips.
  */
 import type { CommodityId, HubTier } from './types/career-economy.js';
 import type { DoCareerRegion } from './career-do-hubs.js';
@@ -26,7 +26,7 @@ const tourismSpoke = {
   consume: { electronics: 0.95, machinery: 0.9 },
 } as const;
 
-/** DO densify (+4) → 10 total. */
+/** DO densify (+5) → 11 total. */
 export const DO_DENSIFY_HUBS: readonly DoDensifyHub[] = [
   {
     icao: 'MDBH',
@@ -64,6 +64,16 @@ export const DO_DENSIFY_HUBS: readonly DoDensifyHub[] = [
     lat: 17.929,
     lon: -71.6448,
     ...agroSpoke,
+  },
+  {
+    icao: 'MDJB',
+    name: 'La Isabela El Higuero',
+    region: 'DO-C',
+    hubTier: 'spoke',
+    lat: 18.5725,
+    lon: -69.9856,
+    produce: { general: 1.15, supplies: 1.0, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
   },
 ];
 

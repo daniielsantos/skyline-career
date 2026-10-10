@@ -34,7 +34,7 @@ const agroSpoke = {
   >,
 };
 
-/** 5 curated Puerto Rico hubs — domestic US region US-PR. */
+/** 7 Puerto Rico hubs — domestic US region US-PR. */
 export const US_PR_CAREER_HUBS: readonly UsPrCareerHubDef[] = [
   {
     icao: 'TJSJ',
@@ -84,9 +84,27 @@ export const US_PR_CAREER_HUBS: readonly UsPrCareerHubDef[] = [
     lon: -67.1485,
     ...agroSpoke,
   },
+  {
+    icao: 'TJCP',
+    name: 'Culebra Benjamin Rivera Noriega',
+    region: 'US-PR',
+    hubTier: 'spoke',
+    lat: 18.313,
+    lon: -65.3039,
+    ...drySpoke,
+  },
+  {
+    icao: 'TJVQ',
+    name: 'Vieques Antonio Rivera Rodriguez',
+    region: 'US-PR',
+    hubTier: 'spoke',
+    lat: 18.1355,
+    lon: -65.4918,
+    ...drySpoke,
+  },
 ];
 
-export const US_PR_CAREER_HUB_COUNT = 5;
+export const US_PR_CAREER_HUB_COUNT = 7;
 
 export function assertUsPrCareerHubCatalog(): void {
   if (US_PR_CAREER_HUBS.length !== US_PR_CAREER_HUB_COUNT) {

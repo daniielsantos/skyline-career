@@ -26,7 +26,7 @@ const tourismSpoke = {
   consume: { electronics: 0.95, machinery: 0.9 },
 } as const;
 
-/** CR densify (+7) → 14 total. Skip MRQP (remaps MRNS). */
+/** CR densify (+9) → 16 total. */
 export const CR_DENSIFY_HUBS: readonly CrDensifyHub[] = [
   {
     icao: 'MRCR',
@@ -91,6 +91,24 @@ export const CR_DENSIFY_HUBS: readonly CrDensifyHub[] = [
     lat: 9.3487,
     lon: -83.7123,
     ...agroSpoke,
+  },
+  {
+    icao: 'MRAO',
+    name: 'Aerotortuguero',
+    region: 'CR-C',
+    hubTier: 'spoke',
+    lat: 10.42,
+    lon: -83.6095,
+    ...agroSpoke,
+  },
+  {
+    icao: 'MRQP',
+    name: 'Quepos La Managua',
+    region: 'CR-C',
+    hubTier: 'spoke',
+    lat: 9.4432,
+    lon: -84.1298,
+    ...tourismSpoke,
   },
 ];
 

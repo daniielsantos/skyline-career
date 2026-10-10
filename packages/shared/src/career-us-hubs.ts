@@ -1320,7 +1320,9 @@ export const US_CAREER_HUB_COUNT =
   (US_HI_CAREER_HUBS.length - 1) +
   US_AK_CAREER_HUBS.length +
   US_DENSIFY_HUB_COUNT +
-  US_SCHEDULED_HUB_COUNT;
+  US_SCHEDULED_HUB_COUNT +
+  // Culebra and Vieques sit on top of the curated Puerto Rico five.
+  2;
 
 function haversineNm(
   a: { lat: number; lon: number },

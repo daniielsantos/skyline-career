@@ -187,6 +187,36 @@ import {
   buildAwFeederCorridors,
 } from './career-aw-hubs.js';
 import {
+  assertKyCareerHubCatalog,
+  KY_CAREER_HUBS,
+  buildKyFeederCorridors,
+} from './career-ky-hubs.js';
+import {
+  assertTcCareerHubCatalog,
+  TC_CAREER_HUBS,
+  buildTcFeederCorridors,
+} from './career-tc-hubs.js';
+import {
+  assertKnCareerHubCatalog,
+  KN_CAREER_HUBS,
+  buildKnFeederCorridors,
+} from './career-kn-hubs.js';
+import {
+  assertVcCareerHubCatalog,
+  VC_CAREER_HUBS,
+  buildVcFeederCorridors,
+} from './career-vc-hubs.js';
+import {
+  assertBqCareerHubCatalog,
+  BQ_CAREER_HUBS,
+  buildBqFeederCorridors,
+} from './career-bq-hubs.js';
+import {
+  assertVgCareerHubCatalog,
+  VG_CAREER_HUBS,
+  buildVgFeederCorridors,
+} from './career-vg-hubs.js';
+import {
   assertPtCareerHubCatalog,
   PT_CAREER_HUBS,
   buildPtFeederCorridors,
@@ -1898,6 +1928,12 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(CW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(SX_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(AW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(KY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TC_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(KN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(VC_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BQ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(VG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(PT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(ES_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(FR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
@@ -2336,9 +2372,9 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'SLLP', b: 'SLCB', weight: 1.8 },
   { a: 'SLVR', b: 'SLCB', weight: 1.6 },
   // Ecuador domestic trunks
-  { a: 'SEQU', b: 'SEGU', weight: 2.1 },
+  { a: 'SEQM', b: 'SEGU', weight: 2.1 },
   { a: 'SEGU', b: 'SECU', weight: 1.6 },
-  { a: 'SEQU', b: 'SEMT', weight: 1.5 },
+  { a: 'SEQM', b: 'SEMT', weight: 1.5 },
   // Colombia domestic trunks
   { a: 'SKBO', b: 'SKRG', weight: 2.2 },
   { a: 'SKBO', b: 'SKCL', weight: 2.0 },
@@ -3033,6 +3069,12 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildCwFeederCorridors(CW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildSxFeederCorridors(SX_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildAwFeederCorridors(AW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildKyFeederCorridors(KY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildTcFeederCorridors(TC_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildKnFeederCorridors(KN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildVcFeederCorridors(VC_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBqFeederCorridors(BQ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildVgFeederCorridors(VG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildPtFeederCorridors(PT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildEsFeederCorridors(ES_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildFrFeederCorridors(FR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
@@ -4054,7 +4096,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'SPQU',
   'SLLP',
   'SLVR',
-  'SEQU',
+  'SEQM',
   'SEGU',
   // Colombia / Venezuela
   'SKBO',
@@ -4100,6 +4142,12 @@ export const FUEL_HUB_ICAOS = new Set([
   'TNCC',
   'TNCM',
   'TNCA',
+  'MWCR',
+  'MBPV',
+  'TKPK',
+  'TVSA',
+  'TNCB',
+  'TUPJ',
   'TIST',
   // EU-1 Western core
   'LPPT',
@@ -5183,6 +5231,42 @@ export const CAREER_HUB_COORDS: Readonly<
     ]),
   ),
   ...Object.fromEntries(
+    KY_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    TC_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    KN_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    VC_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BQ_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    VG_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
     PT_CAREER_HUBS.map((h) => [
       h.icao,
       { lat: h.lat, lon: h.lon, name: h.name },
@@ -6122,7 +6206,7 @@ export function msfsFacilityMatchesCareerHub(
     const label = catalog.name ?? want;
     return {
       ok: false,
-      reason: `MSFS ${want} is ${nm.toFixed(0)} nm from catalog ${label}`,
+      reason: `MSFS ${want} is ${nm.toFixed(0)} nm from catalog ${label} (${facility.lat.toFixed(4)},${facility.lon.toFixed(4)})`,
     };
   }
   return { ok: true };
@@ -6485,6 +6569,12 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertCwCareerHubCatalog();
   assertSxCareerHubCatalog();
   assertAwCareerHubCatalog();
+  assertKyCareerHubCatalog();
+  assertTcCareerHubCatalog();
+  assertKnCareerHubCatalog();
+  assertVcCareerHubCatalog();
+  assertBqCareerHubCatalog();
+  assertVgCareerHubCatalog();
   assertUsViCareerHubCatalog();
   assertUsHiCareerHubCatalog();
   assertUsAkCareerHubCatalog();
@@ -6989,6 +7079,60 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...AW_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...KY_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TC_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...KN_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...VC_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BQ_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...VG_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,
@@ -8615,7 +8759,23 @@ export function remapRetiredCareerAirportIdents(
     if (!(to in CAREER_HUB_COORDS)) continue;
     // Never rewrite a live catalog hub into another (SAOU San Luis must stay
     // SAOU while SAMR San Rafael is also live — SAOU→SAMR created 0 nm lots).
-    if (from in CAREER_HUB_COORDS) continue;
+    if (from in CAREER_HUB_COORDS) {
+      // The code is a live hub now. Still fold a leftover row that is sitting
+      // on the remap target (old San Luis saved as SANL) so coverage can add
+      // the real field. A row already on the catalog pin stays put.
+      const catalog = CAREER_HUB_COORDS[from];
+      const target = CAREER_HUB_COORDS[to];
+      const parked = world.airports.find(
+        (ap) => ap.icao.trim().toUpperCase() === from,
+      );
+      const leftover =
+        parked &&
+        catalog &&
+        target &&
+        distanceNm(parked, catalog) > MSFS_HUB_MATCH_MAX_NM &&
+        distanceNm(parked, target) <= MSFS_HUB_MATCH_MAX_NM;
+      if (!leftover) continue;
+    }
 
     const fromAp = world.airports.find(
       (ap) => ap.icao.trim().toUpperCase() === from,

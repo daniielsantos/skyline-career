@@ -7,6 +7,7 @@ import {
   corridorWeight,
   createSeedEconomyWorld,
   DEAD_LOT_RETENTION_TICKS,
+  distanceNm,
   ensureCareerHubCoverage,
   ensureAirportHubTier,
   ensureEconomyCaughtUp,
@@ -135,14 +136,16 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 2622);
+    assert.equal(world.airports.length, 2709);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 399);
     const br = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'BR',
     );
     const us = world.airports.filter((a) => a.icao.startsWith('K'));
-    const ca = world.airports.filter((a) => a.icao.startsWith('CY'));
+    const ca = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'CA',
+    );
     const mx = world.airports.filter((a) => a.icao.startsWith('MM'));
     const ar = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'AR',
@@ -697,35 +700,35 @@ describe('career-economy seed', () => {
     const ss = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'SS',
     );
-    assert.equal(br.length, 97);
+    assert.equal(br.length, 112);
     assert.equal(us.length, 465);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 0);
-    assert.equal(ca.length, 106);
-    assert.equal(mx.length, 83);
-    assert.equal(ar.length, 70);
+    assert.equal(ca.length, 135);
+    assert.equal(mx.length, 84);
+    assert.equal(ar.length, 72);
     assert.equal(cl.length, 42);
     assert.equal(uy.length, 7);
     assert.equal(py.length, 7);
-    assert.equal(pe.length, 32);
-    assert.equal(bo.length, 21);
+    assert.equal(pe.length, 34);
+    assert.equal(bo.length, 24);
     assert.equal(ec.length, 20);
-    assert.equal(co.length, 42);
-    assert.equal(ve.length, 31);
+    assert.equal(co.length, 44);
+    assert.equal(ve.length, 33);
     assert.equal(gy.length, 9);
     assert.equal(sr.length, 6);
     assert.equal(gf.length, 6);
     assert.equal(pa.length, 12);
-    assert.equal(cr.length, 14);
+    assert.equal(cr.length, 16);
     assert.equal(ni.length, 9);
     assert.equal(hn.length, 10);
     assert.equal(sv.length, 2);
     assert.equal(gt.length, 10);
     assert.equal(bz.length, 4);
     assert.equal(cu.length, 17);
-    assert.equal(dominican.length, 10);
+    assert.equal(dominican.length, 11);
     assert.equal(ht.length, 6);
     assert.equal(jm.length, 6);
-    assert.equal(bs.length, 14);
+    assert.equal(bs.length, 22);
     assert.equal(tt.length, 2);
     assert.equal(bb.length, 1);
     assert.equal(lc.length, 2);
@@ -736,7 +739,7 @@ describe('career-economy seed', () => {
     assert.equal(cw.length, 1);
     assert.equal(sx.length, 1);
     assert.equal(aw.length, 1);
-    assert.equal(usPr.length, 5);
+    assert.equal(usPr.length, 7);
     assert.equal(usVi.length, 2);
     assert.equal(usHi.length, 10);
     assert.equal(usAk.length, 57);
@@ -922,6 +925,7 @@ describe('career-economy seed', () => {
         'BJ',
         'BN',
         'BO',
+        'BQ',
         'BR',
         'BS',
         'BT',
@@ -992,8 +996,10 @@ describe('career-economy seed', () => {
         'KG',
         'KI',
         'KM',
+        'KN',
         'KR',
         'KW',
+        'KY',
         'KZ',
         'LB',
         'LC',
@@ -1062,6 +1068,7 @@ describe('career-economy seed', () => {
         'SX',
         'SY',
         'SZ',
+        'TC',
         'TD',
         'TG',
         'TH',
@@ -1078,7 +1085,9 @@ describe('career-economy seed', () => {
         'US',
         'UY',
         'UZ',
+        'VC',
         'VE',
+        'VG',
         'VN',
         'VU',
         'WS',
@@ -4923,9 +4932,9 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
       npcs: full.npcs,
       npcFlights: [],
     };
-    assert.equal(truncated.airports.length, 61);
+    assert.equal(truncated.airports.length, 72);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 2622);
+    assert.equal(migrated.airports.length, 2709);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));
@@ -5208,11 +5217,17 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     const world = createSeedEconomyWorld({ seed: 'remap-current-idents' });
     const palm = world.airports.find((a) => a.icao === 'KDJT');
     const tashkent = world.airports.find((a) => a.icao === 'UZTT');
+    const ponta = world.airports.find((a) => a.icao === 'SSZW');
+    const quito = world.airports.find((a) => a.icao === 'SEQM');
     assert.ok(palm);
     assert.ok(tashkent);
+    assert.ok(ponta);
+    assert.ok(quito);
     world.airports.push(
       { ...structuredClone(palm!), icao: 'KPBI', name: 'Legacy Palm Beach' },
       { ...structuredClone(tashkent!), icao: 'UTTT', name: 'Legacy Tashkent' },
+      { ...structuredClone(ponta!), icao: 'SBPG', name: 'Legacy Ponta Grossa' },
+      { ...structuredClone(quito!), icao: 'SEQU', name: 'Legacy Quito' },
     );
     world.npcFlights.push({
       id: 'npc-kpbi-leg',
@@ -5235,10 +5250,43 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.equal(world.airports.some((a) => a.icao === 'KPBI'), false);
     assert.equal(world.airports.filter((a) => a.icao === 'UZTT').length, 1);
     assert.equal(world.airports.some((a) => a.icao === 'UTTT'), false);
+    assert.equal(world.airports.filter((a) => a.icao === 'SSZW').length, 1);
+    assert.equal(world.airports.some((a) => a.icao === 'SBPG'), false);
+    assert.equal(world.airports.filter((a) => a.icao === 'SEQM').length, 1);
+    assert.equal(world.airports.some((a) => a.icao === 'SEQU'), false);
     assert.equal(
       world.npcFlights.some((row) => row.originIcao === 'KDJT'),
       true,
     );
+  });
+
+  it('folds a San Luis row saved as SANL and then adds La Rioja', () => {
+    const world = createSeedEconomyWorld({ seed: 'sanl-leftover' });
+    const rioja = world.airports.find((a) => a.icao === 'SANL');
+    const sanLuis = world.airports.find((a) => a.icao === 'SAOU');
+    assert.ok(rioja);
+    assert.ok(sanLuis);
+    world.airports = world.airports.filter((a) => a.icao !== 'SANL');
+    world.airports.push({
+      ...structuredClone(sanLuis!),
+      icao: 'SANL',
+      name: 'Legacy San Luis',
+    });
+    assert.equal(remapRetiredCareerAirportIdents(world), true);
+    assert.equal(world.airports.some((a) => a.icao === 'SANL'), false);
+    assert.equal(world.airports.filter((a) => a.icao === 'SAOU').length, 1);
+    assert.equal(ensureCareerHubCoverage(world), true);
+    const added = world.airports.find((a) => a.icao === 'SANL');
+    assert.ok(added);
+    assert.ok(distanceNm(added!, rioja!) < 1);
+  });
+
+  it('does not send the La Rioja hub to San Luis', () => {
+    const world = createSeedEconomyWorld({ seed: 'sanl-live' });
+    assert.equal(world.airports.filter((a) => a.icao === 'SANL').length, 1);
+    assert.equal(remapRetiredCareerAirportIdents(world), false);
+    assert.equal(world.airports.filter((a) => a.icao === 'SANL').length, 1);
+    assert.equal(world.airports.filter((a) => a.icao === 'SAOU').length, 1);
   });
 
   it('does not remap live SAOU (San Luis) into SAMR and prunes same-OD lots', () => {

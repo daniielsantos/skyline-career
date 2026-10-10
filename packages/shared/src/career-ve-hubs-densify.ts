@@ -1,7 +1,6 @@
 /**
  * Venezuela densify — commercial SV* airports (MSFS + SimBrief).
  * Merged into VE_CAREER_HUBS. No bush strips.
- * Skip SVCP.
  */
 import type { CommodityId, HubTier } from './types/career-economy.js';
 import type { VeCareerRegion } from './career-ve-hubs.js';
@@ -32,7 +31,7 @@ const petroSpoke = {
   consume: { perishables: 1.05, electronics: 0.9 },
 } as const;
 
-/** VE densify (+18) → 31 total. Skip SVBI. */
+/** VE densify (+20) → 33 total. */
 export const VE_DENSIFY_HUBS: readonly VeDensifyHub[] = [
   {
     icao: 'SVCU',
@@ -202,6 +201,24 @@ export const VE_DENSIFY_HUBS: readonly VeDensifyHub[] = [
     lon: -66.6683,
     produce: { general: 1.2, perishables: 1.15, supplies: 1.1 },
     consume: { electronics: 1.0, machinery: 0.9 },
+  },
+  {
+    icao: 'SVBI',
+    name: 'Barinas',
+    region: 'VE-W',
+    hubTier: 'spoke',
+    lat: 8.615,
+    lon: -70.2142,
+    ...agroSpoke,
+  },
+  {
+    icao: 'SVCP',
+    name: 'Carupano Francisco Bermudez',
+    region: 'VE-C',
+    hubTier: 'spoke',
+    lat: 10.66,
+    lon: -63.2617,
+    ...drySpoke,
   },
 ];
 

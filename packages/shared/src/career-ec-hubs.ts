@@ -48,12 +48,12 @@ const agroSpoke = {
 export const EC_CAREER_HUBS: readonly EcCareerHubDef[] = [
   // ── EC-C (5) ─────────────────────────────────────────────────────────────
   {
-    icao: 'SEQU',
+    icao: 'SEQM',
     name: 'Quito Mariscal Sucre',
     region: 'EC-C',
     hubTier: 'major',
-    lat: -0.125,
-    lon: -78.3575,
+    lat: -0.1254,
+    lon: -78.3543,
     produce: { general: 1.5, electronics: 1.25, machinery: 1.1 },
     consume: { perishables: 1.15, general: 1.05, supplies: 1.0 },
   },

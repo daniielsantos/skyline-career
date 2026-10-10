@@ -1,4 +1,24 @@
+import { formatWatchPhaseLabel } from './WatchStatusFooter';
+
 export type SidebarFlightStripKind = 'active' | 'draft' | 'bush' | 'crew';
+
+const MISSION_STATUS_LABEL: Record<string, string> = {
+  accepted: 'Accepted',
+  dispatched: 'Dispatched',
+  in_flight: 'En route',
+};
+
+/** Player-facing status for the sidebar strip. Live Watch phase wins once airborne. */
+export function sidebarFlightStatusLabel(
+  status: string,
+  phase?: string | null,
+): string {
+  if (status === 'in_flight' && phase) {
+    const live = formatWatchPhaseLabel(phase);
+    if (live !== '—') return live;
+  }
+  return MISSION_STATUS_LABEL[status] ?? status.replace(/_/g, ' ');
+}
 
 function StripOpenIcon() {
   return (
@@ -27,11 +47,17 @@ export function SidebarFlightStrip(props: {
   label: string;
   originIcao: string;
   destIcao: string;
-  detail: string;
+  detail?: string;
+  /** Mission status key, used only for the chip color. */
+  status?: string;
+  statusLabel?: string;
   busy: boolean;
   onOpen: () => void;
 }) {
-  const openLabel = `Open ${props.label}, ${props.originIcao} to ${props.destIcao}`;
+  const openLabel = `Open ${props.label}, ${props.originIcao} to ${props.destIcao}${
+    props.statusLabel ? `, ${props.statusLabel}` : ''
+  }`;
+  const statusClass = (props.status ?? 'plain').replace(/[^a-z0-9_]/gi, '');
 
   return (
     <button
@@ -55,7 +81,17 @@ export function SidebarFlightStrip(props: {
         </span>
         <span className="sidebar-flight-strip-icao">{props.destIcao}</span>
       </div>
-      <p className="sidebar-flight-strip-detail">{props.detail}</p>
+      {props.statusLabel ? (
+        <p
+          className={`sidebar-flight-strip-status sidebar-flight-strip-status--${statusClass}`}
+        >
+          <span className="sidebar-flight-strip-status-dot" aria-hidden="true" />
+          {props.statusLabel}
+        </p>
+      ) : null}
+      {props.detail ? (
+        <p className="sidebar-flight-strip-detail">{props.detail}</p>
+      ) : null}
     </button>
   );
 }

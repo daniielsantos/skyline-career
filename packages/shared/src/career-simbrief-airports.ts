@@ -43,6 +43,12 @@ import { MQ_CAREER_HUBS } from './career-mq-hubs.js';
 import { CW_CAREER_HUBS } from './career-cw-hubs.js';
 import { SX_CAREER_HUBS } from './career-sx-hubs.js';
 import { AW_CAREER_HUBS } from './career-aw-hubs.js';
+import { KY_CAREER_HUBS } from './career-ky-hubs.js';
+import { TC_CAREER_HUBS } from './career-tc-hubs.js';
+import { KN_CAREER_HUBS } from './career-kn-hubs.js';
+import { VC_CAREER_HUBS } from './career-vc-hubs.js';
+import { BQ_CAREER_HUBS } from './career-bq-hubs.js';
+import { VG_CAREER_HUBS } from './career-vg-hubs.js';
 import { PT_CAREER_HUBS } from './career-pt-hubs.js';
 import { ES_CAREER_HUBS } from './career-es-hubs.js';
 import { FR_CAREER_HUBS } from './career-fr-hubs.js';
@@ -239,6 +245,12 @@ const ALL_CAREER_HUBS: readonly CareerHubRow[] = [
   ...CW_CAREER_HUBS,
   ...SX_CAREER_HUBS,
   ...AW_CAREER_HUBS,
+  ...KY_CAREER_HUBS,
+  ...TC_CAREER_HUBS,
+  ...KN_CAREER_HUBS,
+  ...VC_CAREER_HUBS,
+  ...BQ_CAREER_HUBS,
+  ...VG_CAREER_HUBS,
   ...PT_CAREER_HUBS,
   ...ES_CAREER_HUBS,
   ...FR_CAREER_HUBS,

@@ -237,7 +237,7 @@ export function assertCoCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<CoCareerRegion, number> = {
-    'CO-C': 19,
+    'CO-C': 21,
     'CO-N': 10,
     'CO-W': 13,
   };

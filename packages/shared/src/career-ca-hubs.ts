@@ -632,11 +632,11 @@ export function assertCaCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<CaCareerRegion, number> = {
-    'CA-W': 24,
-    'CA-PR': 24,
-    'CA-ON': 22,
-    'CA-QC': 22,
-    'CA-AT': 14,
+    'CA-W': 35,
+    'CA-PR': 32,
+    'CA-ON': 28,
+    'CA-QC': 25,
+    'CA-AT': 15,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

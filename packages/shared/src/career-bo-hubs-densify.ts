@@ -1,7 +1,7 @@
 /**
  * Bolivia densify — commercial SL* airports (MSFS + SimBrief).
  * Merged into BO_CAREER_HUBS. No bush strips.
- * Skip SLRI / SLET.
+ * Guayaramerin town strip stays SLGY; the international is SLGM.
  */
 import type { CommodityId, HubTier } from './types/career-economy.js';
 import type { BoCareerRegion } from './career-bo-hubs.js';
@@ -27,7 +27,7 @@ const agroSpoke = {
   consume: { electronics: 0.9, machinery: 0.85 },
 } as const;
 
-/** BO densify (+12) → 21 total. Skip SLRI/SLET; Potosi is SLPO (already seeded); Yacuiba is SLYA not SLYG. */
+/** BO densify (+15) → 24 total. Potosi is SLPO; Yacuiba is SLYA. */
 export const BO_DENSIFY_HUBS: readonly BoDensifyHub[] = [
   {
     icao: 'SLSB',
@@ -138,6 +138,33 @@ export const BO_DENSIFY_HUBS: readonly BoDensifyHub[] = [
     hubTier: 'spoke',
     lat: -16.3872,
     lon: -60.9623,
+    ...agroSpoke,
+  },
+  {
+    icao: 'SLET',
+    name: 'El Trompillo',
+    region: 'BO-E',
+    hubTier: 'spoke',
+    lat: -17.8116,
+    lon: -63.1715,
+    ...drySpoke,
+  },
+  {
+    icao: 'SLGM',
+    name: 'Guayaramerin Intl',
+    region: 'BO-E',
+    hubTier: 'spoke',
+    lat: -10.8886,
+    lon: -65.381,
+    ...drySpoke,
+  },
+  {
+    icao: 'SLRI',
+    name: 'Riberalta Capitan Selin Zeitun Lopez',
+    region: 'BO-E',
+    hubTier: 'spoke',
+    lat: -11.0094,
+    lon: -66.0755,
     ...agroSpoke,
   },
 ];

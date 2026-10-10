@@ -490,8 +490,8 @@ export function assertArCareerHubCatalog(): void {
   }
   const expected: Record<ArCareerRegion, number> = {
     'AR-BA': 23,
-    'AR-CO': 13,
-    'AR-NO': 16,
+    'AR-CO': 14,
+    'AR-NO': 17,
     'AR-PA': 18,
   };
   for (const [region, n] of Object.entries(expected)) {

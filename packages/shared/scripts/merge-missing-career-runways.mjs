@@ -38,7 +38,7 @@ const OA_AIRPORT_ALIASES = {
   SAAJ: 'AR-0743', // Junín (closed)
   SACT: 'AR-0744', // Chamical
   SBQV: 'BR-1961', // Vitória da Conquista Pedro Otacílio (closed)
-  SEQU: 'SEQM', // Quito Mariscal Sucre (new field; career keeps SEQU)
+  SEQU: 'SEQM', // old Quito ident; career hub is SEQM
   MZSP: 'BZ-SPR', // San Pedro John Greif II
 };
 

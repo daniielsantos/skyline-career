@@ -1,7 +1,7 @@
 /**
  * Peru densify — commercial SP* airports (MSFS + SimBrief).
  * Merged into PE_CAREER_HUBS. No bush strips.
- * Skip SPIM (use SPJC) and SPMS.
+ * Skip SPIM (same Jorge Chávez as SPJC).
  */
 import type { CommodityId, HubTier } from './types/career-economy.js';
 import type { PeCareerRegion } from './career-pe-hubs.js';
@@ -32,7 +32,7 @@ const amazonRegional = {
   consume: { electronics: 1.0, machinery: 0.95 },
 } as const;
 
-/** PE densify (+18) → 32 total. Juanjui is SPJI (already seeded); SPJJ dropped. */
+/** PE densify (+20) → 34 total. Juanjui stays SPJI. SPIM stays SPJC. */
 export const PE_DENSIFY_HUBS: readonly PeDensifyHub[] = [
   {
     icao: 'SPSO',
@@ -201,6 +201,24 @@ export const PE_DENSIFY_HUBS: readonly PeDensifyHub[] = [
     lat: -15.3575,
     lon: -75.135,
     ...drySpoke,
+  },
+  {
+    icao: 'SPJJ',
+    name: 'Jauja Francisco Carle',
+    region: 'PE-C',
+    hubTier: 'spoke',
+    lat: -11.7831,
+    lon: -75.4734,
+    ...agroSpoke,
+  },
+  {
+    icao: 'SPMS',
+    name: 'Yurimaguas Moises Benzaquen Rengifo',
+    region: 'PE-C',
+    hubTier: 'spoke',
+    lat: -5.8938,
+    lon: -76.1182,
+    ...agroSpoke,
   },
 ];
 

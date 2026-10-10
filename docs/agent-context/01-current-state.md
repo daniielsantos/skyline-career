@@ -1,4 +1,7 @@
-# Current state (2026-10-09)
+# Current state (2026-10-10)
+
+`main` **d47f49e2** / desktop **0.3.488** shipped: Add a follow-aircraft control on the Dispatch route map so the camera can stay on the live position. Release: [v0.3.488](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.488).
+
 
 `main` **848d5182** / desktop **0.3.487** shipped: Add the Carenado CT210N to the Market on the SimBrief Bonanza B36TC proxy, with its card art. Release: [v0.3.487](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.487).
 

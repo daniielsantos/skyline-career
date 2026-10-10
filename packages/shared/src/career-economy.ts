@@ -1348,7 +1348,34 @@ const LAST_MILE_ORIGIN_TIERS: ReadonlySet<HubTier> = new Set([
 ]);
 /** Comfortable light-GA hop (C172/Bonanza with payload). */
 export const LAST_MILE_MAX_NM = 600;
-const LAST_MILE_MIN_NM = 40;
+export const LAST_MILE_MIN_NM = 40;
+
+export type HeavyLotDistanceDecision = 'allow' | 'defer' | 'reject';
+
+/**
+ * Large and XL share the last-mile distance floor. A domestic origin with no
+ * other cargo airport at or beyond that floor may keep one short contract
+ * (chosen later by price gap). International hops under the floor do not.
+ */
+export function heavyLotDistanceDecision(input: {
+  distanceNm: number | null | undefined;
+  international: boolean;
+  originHasFarDomestic: boolean;
+  originHasOpenShortLot: boolean;
+}): HeavyLotDistanceDecision {
+  if (input.distanceNm == null || !Number.isFinite(input.distanceNm)) {
+    return 'allow';
+  }
+  if (input.distanceNm >= LAST_MILE_MIN_NM) return 'allow';
+  if (
+    input.international ||
+    input.originHasFarDomestic ||
+    input.originHasOpenShortLot
+  ) {
+    return 'reject';
+  }
+  return 'defer';
+}
 /** Open GA Dry lots kept on the board per origin×commodity (majors). */
 export const LAST_MILE_OPEN_LOTS_PER_ORIGIN = 3;
 /**
@@ -11156,6 +11183,62 @@ function* formLotsFromImbalances(
     return rng;
   };
 
+  const farDomesticByOrigin = new Map<string, boolean>();
+  const originHasFarDomesticAirport = (
+    countryId: string,
+    icao: string,
+  ): boolean => {
+    const code = icao.trim().toUpperCase();
+    const cached = farDomesticByOrigin.get(code);
+    if (cached !== undefined) return cached;
+    const list = airportsByCountry.get(countryId) ?? [];
+    let far = false;
+    for (const other of list) {
+      if (other.icao.trim().toUpperCase() === code) continue;
+      if (other.bushTripOnly === true || other.bush === true) continue;
+      const nm = routeDistanceNm(world, code, other.icao);
+      if (nm != null && nm >= LAST_MILE_MIN_NM) {
+        far = true;
+        break;
+      }
+    }
+    farDomesticByOrigin.set(code, far);
+    return far;
+  };
+
+  /** Origins that already list one short heavy lot (available or reserved). */
+  const shortHopTaken = new Set<string>();
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+    if (lot.quantityKg < LARGE_LOT_MIN_KG) continue;
+    const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+    if (nm != null && nm < LAST_MILE_MIN_NM) {
+      shortHopTaken.add(lot.originIcao.trim().toUpperCase());
+    }
+  }
+
+  type ShortHopCandidate = {
+    gap: number;
+    key: string;
+    commodity: (typeof CAREER_CARGO_COMMODITIES)[number];
+    origin: RankedAirport;
+    dest: RankedAirport;
+    qty: number;
+    size: 'xl' | 'large';
+    laneSat: number;
+    inboundKg: number;
+    cw: number;
+    opts: {
+      international: boolean;
+      partitionId: string;
+      capacityKgPerDay?: number;
+      allowSpokeFiller: boolean;
+      originHasOpenCorridor: boolean;
+      precomputedLaneSat?: number;
+    };
+  };
+  const shortHopBest = new Map<string, ShortHopCandidate>();
+
   const pushLot = (
     key: string,
     commodity: (typeof CAREER_COMMODITIES)[number],
@@ -11422,10 +11505,78 @@ function* formLotsFromImbalances(
     qty = Math.floor(qty / 100) * 100;
     let formed = false;
 
+    const pairNm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
+    const shortPair = pairNm != null && pairNm < LAST_MILE_MIN_NM;
+    const heavyDistance = heavyLotDistanceDecision({
+      distanceNm: pairNm,
+      international: opts.international,
+      originHasFarDomestic:
+        shortPair &&
+        !opts.international &&
+        originHasFarDomesticAirport(opts.partitionId, origin.ap.icao),
+      originHasOpenShortLot:
+        shortPair &&
+        shortHopTaken.has(origin.ap.icao.trim().toUpperCase()),
+    });
+
     const portOrigin = isPortPickupHub(origin.ap.icao);
     const xlMinKg = portOrigin ? PORT_XL_LOT_MIN_KG : XL_LOT_MIN_KG;
     const xlLaneCap = caps.maxXl + (portOrigin && caps.maxXl > 0 ? 1 : 0);
+    if (heavyDistance === 'defer') {
+      const originIcao = origin.ap.icao.trim().toUpperCase();
+      let size: 'xl' | 'large' | null = null;
+      let lotQty = 0;
+      if (
+        !boardPressure.skipHeavy &&
+        openXlBoardLots < XL_BOARD_SOFT_CAP &&
+        qty >= xlMinKg &&
+        xlLaneCap > 0 &&
+        (xlCounts.get(key) ?? 0) < xlLaneCap &&
+        (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots &&
+        xlLotOdEligible(origin.tier, dest.tier, cw, {
+          international: opts.international,
+          capacityKgPerDay: opts.capacityKgPerDay,
+          portPickupOrigin: portOrigin,
+        })
+      ) {
+        size = 'xl';
+        lotQty = Math.min(qty, XL_LOT_MAX_KG);
+      } else if (
+        !boardPressure.skipHeavy &&
+        qty >= LARGE_LOT_MIN_KG &&
+        caps.maxLarge > 0 &&
+        (largeCounts.get(key) ?? 0) < caps.maxLarge &&
+        (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
+      ) {
+        size = 'large';
+        lotQty = Math.min(qty, LARGE_LOT_MAX_KG);
+      }
+      if (size && lotQty > 0) {
+        const prev = shortHopBest.get(originIcao);
+        if (
+          !prev ||
+          priceGap > prev.gap ||
+          (priceGap === prev.gap && lotQty > prev.qty)
+        ) {
+          shortHopBest.set(originIcao, {
+            gap: priceGap,
+            key,
+            commodity,
+            origin,
+            dest,
+            qty: lotQty,
+            size,
+            laneSat,
+            inboundKg,
+            cw,
+            opts,
+          });
+        }
+      }
+      return false;
+    }
     if (
+      heavyDistance === 'allow' &&
       !boardPressure.skipHeavy &&
       openXlBoardLots < XL_BOARD_SOFT_CAP &&
       qty >= xlMinKg &&
@@ -11461,6 +11612,7 @@ function* formLotsFromImbalances(
     }
 
     if (
+      heavyDistance === 'allow' &&
       !boardPressure.skipHeavy &&
       qty >= LARGE_LOT_MIN_KG &&
       caps.maxLarge > 0 &&
@@ -11743,6 +11895,28 @@ function* formLotsFromImbalances(
         }
       }
     }
+    for (const cand of shortHopBest.values()) {
+      const originIcao = cand.origin.ap.icao.trim().toUpperCase();
+      if (shortHopTaken.has(originIcao)) continue;
+      if (
+        pushLot(
+          cand.key,
+          cand.commodity,
+          cand.origin,
+          cand.dest,
+          cand.qty,
+          cand.size,
+          cand.laneSat,
+          cand.inboundKg,
+          cand.cw,
+          cand.opts,
+        )
+      ) {
+        if (cand.size === 'xl') openXlBoardLots += 1;
+        shortHopTaken.add(originIcao);
+      }
+    }
+    shortHopBest.clear();
   };
 
   let lotsPhaseAt = performance.now();

@@ -24,6 +24,8 @@ import {
   GA_LTL_MAX_KG,
   INTL_LIGHT_JET_LTL_MAX_NM,
   LAST_MILE_MAX_NM,
+  LAST_MILE_MIN_NM,
+  heavyLotDistanceDecision,
   SMALL_LOT_MAX_NM,
   LAST_MILE_OPEN_LOTS_PER_ORIGIN,
   LAST_MILE_OPEN_LOTS_PER_REGIONAL_ORIGIN,
@@ -5632,5 +5634,63 @@ describe('pruneDeadLots', () => {
     };
     const migrated = migrateEconomyWorld(raw);
     assert.equal(migrated.lots.length, 0);
+  });
+
+  it('keeps large and XL off metro hops unless the origin has no farther domestic field', () => {
+    assert.equal(LAST_MILE_MIN_NM, 40);
+    assert.equal(
+      heavyLotDistanceDecision({
+        distanceNm: 2,
+        international: false,
+        originHasFarDomestic: true,
+        originHasOpenShortLot: false,
+      }),
+      'reject',
+    );
+    assert.equal(
+      heavyLotDistanceDecision({
+        distanceNm: 2,
+        international: true,
+        originHasFarDomestic: false,
+        originHasOpenShortLot: false,
+      }),
+      'reject',
+    );
+    assert.equal(
+      heavyLotDistanceDecision({
+        distanceNm: 2,
+        international: false,
+        originHasFarDomestic: false,
+        originHasOpenShortLot: true,
+      }),
+      'reject',
+    );
+    assert.equal(
+      heavyLotDistanceDecision({
+        distanceNm: 2,
+        international: false,
+        originHasFarDomestic: false,
+        originHasOpenShortLot: false,
+      }),
+      'defer',
+    );
+    assert.equal(
+      heavyLotDistanceDecision({
+        distanceNm: 40,
+        international: false,
+        originHasFarDomestic: true,
+        originHasOpenShortLot: false,
+      }),
+      'allow',
+    );
+    assert.equal(
+      heavyLotDistanceDecision({
+        distanceNm: null,
+        international: false,
+        originHasFarDomestic: true,
+        originHasOpenShortLot: false,
+      }),
+      'allow',
+    );
   });
 });

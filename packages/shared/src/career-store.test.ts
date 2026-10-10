@@ -434,9 +434,24 @@ describe('career store', () => {
 
     // Round-trip save/load company tables.
     m.walletUsd = 99_000;
+    m.pilotFlightHours = 6.5;
+    m.lastSettleOutcome = {
+      missionId: 'msn_1',
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      atTick: 10,
+      hangarNote: 'SBGR→SBSP · General clean.',
+      pilotHoursDelta: 1.5,
+      pilotHoursAfter: 6.5,
+      dryClean: true,
+      pilotPayUsd: null,
+    };
     await store.saveMissions(m);
     const again = await store.loadMissions();
     assert.equal(again.walletUsd, 99_000);
+    assert.equal(again.pilotFlightHours, 6.5);
+    assert.equal(again.lastSettleOutcome?.hangarNote, 'SBGR→SBSP · General clean.');
+    assert.equal(again.lastSettleOutcome?.pilotHoursAfter, 6.5);
     assert.equal(again.fleet[0]?.id, 'ac_test_1');
     assert.equal(again.missions[0]?.id, 'msn_1');
 

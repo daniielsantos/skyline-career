@@ -267,6 +267,16 @@ export function ensureV3Ddl(db: SqliteDb): void {
   if (!columnExists(db, 'company_state', 'va_auto_haul_json')) {
     db.exec(`ALTER TABLE company_state ADD COLUMN va_auto_haul_json TEXT`);
   }
+  if (!columnExists(db, 'company_state', 'pilot_flight_hours')) {
+    db.exec(
+      `ALTER TABLE company_state ADD COLUMN pilot_flight_hours REAL NOT NULL DEFAULT 0`,
+    );
+  }
+  if (!columnExists(db, 'company_state', 'last_settle_outcome_json')) {
+    db.exec(
+      `ALTER TABLE company_state ADD COLUMN last_settle_outcome_json TEXT`,
+    );
+  }
   // Fleet columns promoted out of payload_json (registration / hours / MX / config).
   const fleetCols: Array<[string, string]> = [
     ['registration', 'TEXT'],
@@ -1603,6 +1613,7 @@ export function upsertCompanyState(
        player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
        port_pickups_json, player_warehouses_json, player_port_concessions_json,
        port_auto_buy_orders_json, va_line_crew_json, va_auto_haul_json,
+       pilot_flight_hours, last_settle_outcome_json,
        last_seen_tick, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
@@ -1611,6 +1622,7 @@ export function upsertCompanyState(
        @player_fbos_json, @company_crew_json, @ground_staff_json, @active_bush_trip_json,
        @port_pickups_json, @player_warehouses_json, @player_port_concessions_json,
        @port_auto_buy_orders_json, @va_line_crew_json, @va_auto_haul_json,
+       @pilot_flight_hours, @last_settle_outcome_json,
        @last_seen_tick, @updated_at_ms
      )
      ON CONFLICT(company_id) DO UPDATE SET
@@ -1641,6 +1653,8 @@ export function upsertCompanyState(
        port_auto_buy_orders_json = excluded.port_auto_buy_orders_json,
        va_line_crew_json = excluded.va_line_crew_json,
        va_auto_haul_json = excluded.va_auto_haul_json,
+       pilot_flight_hours = excluded.pilot_flight_hours,
+       last_settle_outcome_json = excluded.last_settle_outcome_json,
        last_seen_tick = excluded.last_seen_tick,
        updated_at_ms = excluded.updated_at_ms`,
   ).run({
@@ -1693,6 +1707,14 @@ export function upsertCompanyState(
     va_auto_haul_json: state.vaAutoHaul
       ? JSON.stringify(state.vaAutoHaul)
       : null,
+    pilot_flight_hours:
+      typeof state.pilotFlightHours === 'number' &&
+      Number.isFinite(state.pilotFlightHours)
+        ? Math.max(0, state.pilotFlightHours)
+        : 0,
+    last_settle_outcome_json: state.lastSettleOutcome
+      ? JSON.stringify(state.lastSettleOutcome)
+      : null,
     last_seen_tick:
       typeof state.lastSeenTick === 'number' && Number.isFinite(state.lastSeenTick)
         ? Math.max(0, Math.floor(state.lastSeenTick))
@@ -1712,7 +1734,8 @@ export function readCompanyStateScalars(
               aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
               company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
               player_warehouses_json, player_port_concessions_json,
-              port_auto_buy_orders_json, va_line_crew_json, va_auto_haul_json, last_seen_tick
+              port_auto_buy_orders_json, va_line_crew_json, va_auto_haul_json,
+              pilot_flight_hours, last_settle_outcome_json, last_seen_tick
        FROM company_state WHERE company_id = ?`,
     )
     .get(companyId) as
@@ -1738,6 +1761,8 @@ export function readCompanyStateScalars(
         port_auto_buy_orders_json: string | null;
         va_line_crew_json: string | null;
         va_auto_haul_json: string | null;
+        pilot_flight_hours: number | null;
+        last_settle_outcome_json: string | null;
         last_seen_tick: number;
       }
     | undefined;
@@ -1847,6 +1872,20 @@ export function readCompanyStateScalars(
   if (row.va_auto_haul_json) {
     try {
       out.vaAutoHaul = JSON.parse(row.va_auto_haul_json);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (
+    typeof row.pilot_flight_hours === 'number' &&
+    Number.isFinite(row.pilot_flight_hours) &&
+    row.pilot_flight_hours > 0
+  ) {
+    out.pilotFlightHours = row.pilot_flight_hours;
+  }
+  if (row.last_settle_outcome_json) {
+    try {
+      out.lastSettleOutcome = JSON.parse(row.last_settle_outcome_json);
     } catch {
       /* ignore */
     }

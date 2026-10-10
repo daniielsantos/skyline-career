@@ -449,6 +449,8 @@ CREATE INDEX IF NOT EXISTS company_flight_quality_stats_day_idx
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE company_state ADD COLUMN IF NOT EXISTS va_line_crew_json JSONB;
 ALTER TABLE company_state ADD COLUMN IF NOT EXISTS va_auto_haul_json JSONB;
+ALTER TABLE company_state ADD COLUMN IF NOT EXISTS pilot_flight_hours DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE company_state ADD COLUMN IF NOT EXISTS last_settle_outcome_json JSONB;
 
 CREATE TABLE IF NOT EXISTS company_join_requests (
   id TEXT PRIMARY KEY NOT NULL,

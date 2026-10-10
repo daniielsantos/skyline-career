@@ -4156,7 +4156,8 @@ async function readCompanyStateScalars(
             aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
             company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
             player_warehouses_json, player_port_concessions_json,
-            port_auto_buy_orders_json, va_line_crew_json, va_auto_haul_json, last_seen_tick
+            port_auto_buy_orders_json, va_line_crew_json, va_auto_haul_json,
+            pilot_flight_hours, last_settle_outcome_json, last_seen_tick
      FROM company_state WHERE company_id = $1`,
     [companyId],
   );
@@ -4237,6 +4238,12 @@ async function readCompanyStateScalars(
     row.va_auto_haul_json,
   );
   if (autoHaul) out.vaAutoHaul = autoHaul;
+  const pilotHours = num(row.pilot_flight_hours);
+  if (pilotHours > 0) out.pilotFlightHours = pilotHours;
+  const lastSettle = parseJson<CareerMissionsState['lastSettleOutcome']>(
+    row.last_settle_outcome_json,
+  );
+  if (lastSettle) out.lastSettleOutcome = lastSettle;
   // Column kept for migrate; bush trips removed — never hydrate activeBushTrip.
   void row.active_bush_trip_json;
 
@@ -4487,6 +4494,7 @@ export async function persistMissionsTablesToPg(
          player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
          port_pickups_json, player_warehouses_json, player_port_concessions_json,
          port_auto_buy_orders_json, va_line_crew_json, va_auto_haul_json,
+         pilot_flight_hours, last_settle_outcome_json,
          last_seen_tick, updated_at_ms
        ) VALUES (
          $1, $2, $3, $4, $5,
@@ -4494,7 +4502,8 @@ export async function persistMissionsTablesToPg(
          $10, $11, $12::jsonb,
          $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb,
          $17::jsonb, $18::jsonb, $19::jsonb,
-         $20::jsonb, $21::jsonb, $22::jsonb, $23, $24
+         $20::jsonb, $21::jsonb, $22::jsonb, $23, $24::jsonb,
+         $25, $26
        )
        ON CONFLICT (company_id) DO UPDATE SET
          wallet_usd = EXCLUDED.wallet_usd,
@@ -4524,6 +4533,8 @@ export async function persistMissionsTablesToPg(
          port_auto_buy_orders_json = EXCLUDED.port_auto_buy_orders_json,
          va_line_crew_json = EXCLUDED.va_line_crew_json,
          va_auto_haul_json = EXCLUDED.va_auto_haul_json,
+         pilot_flight_hours = EXCLUDED.pilot_flight_hours,
+         last_settle_outcome_json = EXCLUDED.last_settle_outcome_json,
          last_seen_tick = EXCLUDED.last_seen_tick,
          updated_at_ms = EXCLUDED.updated_at_ms`,
       [
@@ -4559,6 +4570,11 @@ export async function persistMissionsTablesToPg(
         jsonParam(state.portAutoBuyOrders ?? []),
         jsonParam(state.vaLineCrew ?? null),
         jsonParam(state.vaAutoHaul ?? null),
+        typeof state.pilotFlightHours === 'number' &&
+        Number.isFinite(state.pilotFlightHours)
+          ? Math.max(0, state.pilotFlightHours)
+          : 0,
+        jsonParam(state.lastSettleOutcome ?? null),
         typeof state.lastSeenTick === 'number' &&
           Number.isFinite(state.lastSeenTick)
           ? Math.max(0, Math.floor(state.lastSeenTick))

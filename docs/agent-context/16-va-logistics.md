@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-10: **Horas do piloto não ficavam no Hangar** — sintoma = Class Ops soma block hours e o chip Pilot continua em 0 depois de vários settles. Causa = `applyPilotCareerSettle` grava `pilotFlightHours` e `lastSettleOutcome` na memória, mas o save de `company_state` (SQLite e Postgres) não tinha coluna; o próximo `loadMissions` lia o banco e zerava. Fix = colunas `pilot_flight_hours` e `last_settle_outcome_json`. Horas já voadas antes desse save não estão no banco; o Class Ops não é esse contador.
+
 Atualizado 2026-10-04: **Hauls não empurra o desk ao selecionar Active** — sintoma = a linha `CYZR → KMIA · Cruise · FL…` nascia acima de Open desk work e deslocava a lista. Causa = `va-hauls-live-status` era um bloco entre o mapa e o desk. Fix = a fase/FL/kt/% fica na própria linha Active selecionada. A rota já está nessa linha; o mapa continua com o traço.
 
 Atualizado 2026-10-04: **Charter do porto no Active** — sintoma = um grupo do lobby já aceito ou no ar não aparecia em Hauls → Active. Causa = a lista só tinha Internal Haul, Demand e Wide haul. Fix = missão `charter` com oferta `charter-offer:port:` entra nessa lista (Pax / Bag). O clique usa o mesmo mapa live da linha ativa. Charter do quadro mundial fica de fora. O corte de rota não muda: isto não é trabalho de mesa.

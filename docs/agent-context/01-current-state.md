@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **a3cc1e77** / desktop **0.3.495** shipped: Load the METAR parser from the server folder so the world API can start. Release: [v0.3.495](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.495).
+
+
 `main` **23736f8c** / desktop **0.3.494** shipped: Show live wind and QNH on the active flight, and call a tailwind on the planned arrival runway. Release: [v0.3.494](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.494).
 
 

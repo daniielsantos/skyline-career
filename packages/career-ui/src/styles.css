@@ -11713,6 +11713,29 @@ span.dispatch-route-hub-dest {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+.dispatch-route-map .maplibregl-ctrl-group button.dispatch-route-follow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d5dbe6;
+}
+
+.dispatch-route-map .maplibregl-ctrl-group button.dispatch-route-follow svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.dispatch-route-map .maplibregl-ctrl-group button.dispatch-route-follow.is-active {
+  color: #7dd3fc;
+  background-color: color-mix(in srgb, #7dd3fc 22%, #16161a);
+}
+
+.dispatch-route-map .maplibregl-ctrl-group button.dispatch-route-follow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .dispatch-route-marker {
   display: grid;
   justify-items: center;

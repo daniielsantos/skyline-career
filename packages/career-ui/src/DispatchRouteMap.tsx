@@ -374,6 +374,17 @@ function resolveLiveTip(
   return usableAircraftPosition(aircraft) ? aircraft : null;
 }
 
+/** Same point the AC dot uses: trail tip on Crew Live, Watch fix on Dispatch. */
+function followTarget(props: {
+  plannedOd?: boolean;
+  trail?: Array<{ lat: number; lon: number }> | null;
+  aircraft?: DispatchAircraftPosition | null;
+}): DispatchAircraftPosition | null {
+  return resolveLiveTip(props.plannedOd ? props.trail : null, props.aircraft);
+}
+
+const FOLLOW_AIRCRAFT_ICON = `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.15" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.6v3.1M10 15.3v3.1M1.6 10h3.1M15.3 10h3.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
 /** Same tip for solid trail end, dashed start, and AC — never diverge. */
 function syncLiveTrackLayers(
   map: Map,
@@ -630,6 +641,31 @@ export function DispatchRouteMap(props: {
   liveSyncPropsRef.current = props;
   const onSelectRef = useRef(props.onSelectAirport);
   onSelectRef.current = props.onSelectAirport;
+  const followRef = useRef(false);
+  const followBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  function paintFollowButton() {
+    const btn = followBtnRef.current;
+    if (!btn) return;
+    const hasTarget = Boolean(followTarget(liveSyncPropsRef.current));
+    if (!hasTarget) followRef.current = false;
+    const on = followRef.current && hasTarget;
+    btn.hidden = !hasTarget;
+    btn.disabled = !hasTarget;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function easeFollow(map: Map) {
+    if (!followRef.current) return;
+    const tip = followTarget(liveSyncPropsRef.current);
+    if (!tip) return;
+    map.easeTo({
+      center: [tip.lon, tip.lat],
+      duration: 450,
+      essential: true,
+    });
+  }
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -641,12 +677,36 @@ export function DispatchRouteMap(props: {
       attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    const zoomGroup = map
+      .getContainer()
+      .querySelector('.maplibregl-ctrl-top-right .maplibregl-ctrl-group');
+    if (zoomGroup) {
+      const followBtn = document.createElement('button');
+      followBtn.type = 'button';
+      followBtn.className = 'dispatch-route-follow';
+      followBtn.title = 'Follow aircraft';
+      followBtn.setAttribute('aria-label', 'Follow aircraft');
+      followBtn.setAttribute('aria-pressed', 'false');
+      followBtn.hidden = true;
+      followBtn.disabled = true;
+      followBtn.innerHTML = FOLLOW_AIRCRAFT_ICON;
+      followBtn.addEventListener('click', () => {
+        const tip = followTarget(liveSyncPropsRef.current);
+        if (!tip) return;
+        followRef.current = !followRef.current;
+        paintFollowButton();
+        if (followRef.current) easeFollow(map);
+      });
+      zoomGroup.appendChild(followBtn);
+      followBtnRef.current = followBtn;
+    }
     mapRef.current = map;
     fittedRouteKeyRef.current = null;
 
     const flushLiveSync = () => {
       if (!pendingLiveSyncRef.current) return;
-      if (map.isMoving()) return;
+      // Follow eases the camera; that must not freeze the AC dot.
+      if (map.isMoving() && !followRef.current) return;
       pendingLiveSyncRef.current = false;
       const p = liveSyncPropsRef.current;
       if (p.plannedOd) {
@@ -665,13 +725,21 @@ export function DispatchRouteMap(props: {
           true,
           p.aircraft,
         );
-        return;
+      } else {
+        setAircraftOnMap(map, resolveLiveTip(null, p.aircraft));
       }
-      setAircraftOnMap(map, resolveLiveTip(null, p.aircraft));
+      paintFollowButton();
+      easeFollow(map);
     };
 
     map.on('moveend', flushLiveSync);
     map.on('zoomend', flushLiveSync);
+    // Pan looks around; zoom stays in follow so +/- still tracks the aircraft.
+    map.on('dragstart', () => {
+      if (!followRef.current) return;
+      followRef.current = false;
+      paintFollowButton();
+    });
 
     let resizeRaf = 0;
     const resizeObserver =
@@ -692,6 +760,8 @@ export function DispatchRouteMap(props: {
       cancelAnimationFrame(resizeRaf);
       map.off('moveend', flushLiveSync);
       map.off('zoomend', flushLiveSync);
+      followBtnRef.current = null;
+      followRef.current = false;
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
       map.remove();
@@ -868,14 +938,16 @@ export function DispatchRouteMap(props: {
         );
         if (fittedRouteKeyRef.current !== cameraKey) {
           fittedRouteKeyRef.current = cameraKey;
-          if (segments?.length) {
+          // Follow owns the camera; a navlog refresh must not pull it back.
+          // The key is still recorded so turning follow off does not refit.
+          if (!followRef.current && segments?.length) {
             const bounds = new LngLatBounds();
             for (const seg of segments) {
               bounds.extend([seg.from.lon, seg.from.lat]);
               bounds.extend([seg.to.lon, seg.to.lat]);
             }
             map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
-          } else if (dest || trail?.length) {
+          } else if (!followRef.current && (dest || trail?.length)) {
             const bounds = new LngLatBounds();
             bounds.extend([props.origin.lon, props.origin.lat]);
             if (dest) bounds.extend([dest.lon, dest.lat]);
@@ -892,7 +964,7 @@ export function DispatchRouteMap(props: {
               }
             }
             map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
-          } else {
+          } else if (!followRef.current) {
             map.flyTo({
               center: [props.origin.lon, props.origin.lat],
               zoom: 5.5,
@@ -941,8 +1013,11 @@ export function DispatchRouteMap(props: {
         props.trail,
         props.aircraft,
       );
-      if (key === lastLiveSyncKeyRef.current) return;
-      if (map.isMoving()) {
+      if (key === lastLiveSyncKeyRef.current) {
+        paintFollowButton();
+        return;
+      }
+      if (map.isMoving() && !followRef.current) {
         pendingLiveSyncRef.current = true;
         return;
       }
@@ -957,10 +1032,12 @@ export function DispatchRouteMap(props: {
           true,
           props.aircraft,
         );
-        return;
+      } else {
+        // En route Dispatch: OFP line from paint; only the AC dot follows Watch.
+        setAircraftOnMap(map, resolveLiveTip(null, props.aircraft));
       }
-      // En route Dispatch: OFP line from paint; only the AC dot follows Watch.
-      setAircraftOnMap(map, resolveLiveTip(null, props.aircraft));
+      paintFollowButton();
+      easeFollow(map);
     };
 
     if (map.isStyleLoaded()) sync();
@@ -983,6 +1060,10 @@ export function DispatchRouteMap(props: {
     if (!map || !target) return;
     if (!Number.isFinite(target.lat) || !Number.isFinite(target.lon)) return;
     if (target.lat === 0 && target.lon === 0) return;
+    if (followRef.current) {
+      followRef.current = false;
+      paintFollowButton();
+    }
     const zoom =
       typeof target.zoom === 'number' && Number.isFinite(target.zoom)
         ? target.zoom

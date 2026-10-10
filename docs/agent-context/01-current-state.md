@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **a6a88164** / desktop **0.3.491** shipped: Add the remaining scheduled US hubs, including Alaska and Hawaii, and use the MSFS idents for Palm Beach and Uzbekistan. Release: [v0.3.491](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.491).
+
+
 `main` **74fe953e** / desktop **0.3.490** shipped: Keep large and XL freight off hops under 40 nm, with one short contract when the origin has no farther domestic airport. Release: [v0.3.490](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.490).
 
 

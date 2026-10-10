@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchMetar, type MetarStation } from './api';
-import { formatQnh, formatTailwind, formatWind, plannedRunway } from './metar-brief';
+import { formatQnh, formatTailwind, formatWind, plannedRunway } from '../server/metar-brief';
 
 export function DispatchMetarLine(props: {
   originIcao: string;

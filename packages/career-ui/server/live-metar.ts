@@ -1,4 +1,4 @@
-import { stationsFromAviationWeather, type MetarStation } from '../src/metar-brief.ts';
+import { stationsFromAviationWeather, type MetarStation } from './metar-brief.ts';
 
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; stations: Record<string, MetarStation> }>();

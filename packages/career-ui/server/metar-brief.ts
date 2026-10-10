@@ -1,4 +1,7 @@
-/** Live METAR fields the dispatch line actually shows. */
+/**
+ * Live METAR fields the dispatch line shows.
+ * Lives under server/ because the world image copies that folder and not src/.
+ */
 export type MetarStation = {
   windDir: number | null;
   windSpeedKt: number | null;

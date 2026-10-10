@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **a1e51549** / desktop **0.3.489** shipped: Persist pilot flight hours on the company save so a reload does not wipe the Hangar counter. Release: [v0.3.489](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.489).
+
+
 `main` **d47f49e2** / desktop **0.3.488** shipped: Add a follow-aircraft control on the Dispatch route map so the camera can stay on the live position. Release: [v0.3.488](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.488).
 
 

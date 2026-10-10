@@ -1,5 +1,8 @@
 # Current state (2026-10-10)
 
+`main` **23736f8c** / desktop **0.3.494** shipped: Show live wind and QNH on the active flight, and call a tailwind on the planned arrival runway. Release: [v0.3.494](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.494).
+
+
 `main` **772c1904** / desktop **0.3.493** shipped: Add the remaining scheduled Western Europe hubs, including Gibraltar. Release: [v0.3.493](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.493).
 
 

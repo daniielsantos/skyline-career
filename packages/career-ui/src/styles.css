@@ -1768,6 +1768,27 @@ td.net-neg {
   text-align: center;
 }
 
+.dispatch-metar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 1.1rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+.dispatch-metar-icao {
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.dispatch-metar-tail {
+  color: var(--warn, #c48a2a);
+}
+
 .missions-head-center h2 {
   display: flex;
   align-items: center;

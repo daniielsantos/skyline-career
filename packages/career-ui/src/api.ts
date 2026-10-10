@@ -2095,6 +2095,25 @@ export async function fetchSatelliteMapStyle() {
   );
 }
 
+export type MetarStation = {
+  windDir: number | null;
+  windSpeedKt: number | null;
+  windGustKt: number | null;
+  qnhHpa: number | null;
+  variable: boolean;
+};
+
+export function fetchMetar(icaos: string[]) {
+  const ids = [...new Set(icaos.map((icao) => icao.trim().toUpperCase()))]
+    .filter((icao) => /^[A-Z0-9]{4}$/.test(icao))
+    .slice(0, 2);
+  if (!ids.length) return Promise.resolve({ stations: {} as Record<string, MetarStation> });
+  return api<{ stations: Record<string, MetarStation> }>(
+    `/api/weather/metar?ids=${ids.join(',')}`,
+    { cache: 'no-store' },
+  );
+}
+
 export function fetchAirportRunways(icao: string) {
   return api<{ icao: string; runways: CareerRunway[] }>(
     `/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}/runways`,

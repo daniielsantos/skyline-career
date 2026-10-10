@@ -58,6 +58,7 @@ describe('career-api-mode', () => {
     assert.equal(isGatewayProxiedPath('/assets/index.js'), false);
     assert.equal(isGatewayProxiedPath('/api/health'), false);
     assert.equal(isGatewayProxiedPath('/api/map/satellite-style'), false);
+    assert.equal(isGatewayProxiedPath('/api/weather/metar'), false);
     assert.equal(isGatewayProxiedPath('/api/watch/status'), false);
     assert.equal(isGatewayProxiedPath('/api/market'), true);
     assert.equal(isGatewayProxiedPath('/api/auth/login'), true);

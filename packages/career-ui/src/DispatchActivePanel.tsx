@@ -49,6 +49,7 @@ import { mxFuelBurnAlertText, mxFuelBurnAlertTitle } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
 import { CargoLotCards, type CargoLotCardLine } from './CargoLotCards';
 import { DestRunwaysButton } from './DestRunwaysButton';
+import { DispatchMetarLine } from './DispatchMetarLine';
 import { playPreflightReadySound, notePreflightNotReady } from './ui-sounds';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
@@ -576,6 +577,12 @@ export function DispatchActivePanel(props: {
               </>
             ) : null}
           </p>
+          <DispatchMetarLine
+            originIcao={mission.originIcao}
+            destIcao={mission.destIcao}
+            route={mission.lastOfpCheck?.briefing?.route}
+            enRoute={isEnRoute}
+          />
         </div>
         <div className="missions-head-actions">
           {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (

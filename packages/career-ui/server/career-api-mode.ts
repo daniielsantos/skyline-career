@@ -41,6 +41,8 @@ export function isGatewayProxiedPath(path: string): boolean {
   if (p === '/api/health') return false;
   // Map style uses host/.env MAPTILER_KEY — keep on gateway (world may lack the key).
   if (p === '/api/map/satellite-style') return false;
+  // Live METAR is public weather, not company state. Stay on the desktop.
+  if (p === '/api/weather/metar') return false;
   if (isSimLocalApiPath(p)) return false;
   if (p.startsWith('/api/')) return true;
   if (p.startsWith('/worlds/')) return true;

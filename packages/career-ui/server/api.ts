@@ -436,6 +436,7 @@ import {
   type CareerApiMode,
 } from './career-api-mode.ts';
 import { proxyToWorldApi } from './gateway-proxy.ts';
+import { liveMetar } from './live-metar.ts';
 
 function deskHoldDispatchSlices(body: {
   holdId?: string;
@@ -9499,6 +9500,13 @@ export function createCareerApiServer(port = 8787) {
           fleet,
           activity: mapNpcActivity(world, nowMs),
         });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/weather/metar') {
+        const ids = (url.searchParams.get('ids') ?? '').split(',');
+        const stations = await liveMetar(ids);
+        send(res, 200, { stations });
         return;
       }
 

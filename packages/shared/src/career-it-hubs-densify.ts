@@ -334,6 +334,42 @@ export const IT_DENSIFY_HUBS: readonly ItDensifyHub[] = [
     produce: { general: 1.1, supplies: 1, perishables: 1.05 },
     consume: { electronics: 0.9, machinery: 0.85 },
   },
+  {
+    icao: 'LIMP',
+    name: 'Parma',
+    region: 'IT-N',
+    hubTier: 'spoke',
+    lat: 44.8222,
+    lon: 10.2953,
+    ...drySpoke,
+  },
+  {
+    icao: 'LIPK',
+    name: 'Forli',
+    region: 'IT-N',
+    hubTier: 'spoke',
+    lat: 44.1956,
+    lon: 12.0697,
+    ...drySpoke,
+  },
+  {
+    icao: 'LIPO',
+    name: 'Brescia Montichiari',
+    region: 'IT-N',
+    hubTier: 'spoke',
+    lat: 45.4289,
+    lon: 10.3306,
+    ...industrial,
+  },
+  {
+    icao: 'LIRJ',
+    name: 'Elba Marina di Campo',
+    region: 'IT-C',
+    hubTier: 'spoke',
+    lat: 42.7611,
+    lon: 10.2397,
+    ...agro,
+  },
 ];
 
 export const IT_DENSIFY_HUB_COUNT = IT_DENSIFY_HUBS.length;

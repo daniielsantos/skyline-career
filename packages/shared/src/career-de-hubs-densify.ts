@@ -382,6 +382,15 @@ export const DE_DENSIFY_HUBS: readonly DeDensifyHub[] = [
     produce: { general: 1.1, supplies: 1, perishables: 1.05 },
     consume: { electronics: 0.9, machinery: 0.85 },
   },
+  {
+    icao: 'ETNL',
+    name: 'Rostock Laage',
+    region: 'DE-N',
+    hubTier: 'spoke',
+    lat: 53.9181,
+    lon: 12.2793,
+    ...drySpoke,
+  },
 ];
 
 export const DE_DENSIFY_HUB_COUNT = DE_DENSIFY_HUBS.length;

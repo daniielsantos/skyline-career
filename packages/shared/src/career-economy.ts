@@ -667,6 +667,11 @@ import {
   buildLuFeederCorridors,
 } from './career-lu-hubs.js';
 import {
+  assertGiCareerHubCatalog,
+  GI_CAREER_HUBS,
+  buildGiFeederCorridors,
+} from './career-gi-hubs.js';
+import {
   assertMtCareerHubCatalog,
   MT_CAREER_HUBS,
   buildMtFeederCorridors,
@@ -1976,6 +1981,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(AM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(AZ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(LU_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(GI_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(CY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(XK_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
@@ -3117,6 +3123,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildAmFeederCorridors(AM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildAzFeederCorridors(AZ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildLuFeederCorridors(LU_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildGiFeederCorridors(GI_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMtFeederCorridors(MT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildCyFeederCorridors(CY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildXkFeederCorridors(XK_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
@@ -4326,6 +4333,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'UDYZ',
   'UBBB',
   'ELLX',
+  'LXGB',
   'LMML',
   'LCLK',
   'BKPR',
@@ -5513,6 +5521,12 @@ export const CAREER_HUB_COORDS: Readonly<
     ]),
   ),
   ...Object.fromEntries(
+    GI_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
     MT_CAREER_HUBS.map((h) => [
       h.icao,
       { lat: h.lat, lon: h.lon, name: h.name },
@@ -6622,6 +6636,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertAmCareerHubCatalog();
   assertAzCareerHubCatalog();
   assertLuCareerHubCatalog();
+  assertGiCareerHubCatalog();
   assertMtCareerHubCatalog();
   assertCyCareerHubCatalog();
   assertXkCareerHubCatalog();
@@ -7502,6 +7517,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...LU_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...GI_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

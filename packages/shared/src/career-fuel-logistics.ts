@@ -914,7 +914,7 @@ function fuelFleetNeedsTopUp(trucks: FuelTruck[]): boolean {
  * never homes a truck there, so each region borrows one idle truck.
  */
 function ensureIsolatedIslandHomeTrucks(world: CareerEconomyWorld): void {
-  const regions = ['KY-C', 'TC-C', 'KN-C', 'VC-C', 'BQ-C', 'VG-C'];
+  const regions = ['KY-C', 'TC-C', 'KN-C', 'VC-C', 'BQ-C', 'VG-C', 'GI-C'];
   const trucks = world.fuelTrucks;
   if (!trucks?.length) return;
   for (const region of regions) {

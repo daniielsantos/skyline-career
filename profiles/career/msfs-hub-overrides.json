@@ -64603,5 +64603,503 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "EGAE": {
+    "name": "The City of Derry Airport",
+    "lat": 55.04277762025595,
+    "lon": -7.161944657564163,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 197.32569885253906,
+        "lengthM": 1202.20654296875,
+        "widthM": 40.11136245727539,
+        "lat": 55.04199609160423,
+        "lon": -7.162515074014664,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "26",
+        "headingTrueDeg": 253.03091430664062,
+        "lengthM": 1967.22705078125,
+        "widthM": 43.169593811035156,
+        "lat": 55.04267670214176,
+        "lon": -7.161947339773178,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGJJ": {
+    "name": "Jersey",
+    "lat": 49.208055697381496,
+    "lon": -2.195555716753006,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 82.72051239013672,
+        "lengthM": 1704.84765625,
+        "widthM": 44.04582214355469,
+        "lat": 49.208001382648945,
+        "lon": -2.195284366607666,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGPB": {
+    "name": "Sumburgh",
+    "lat": 59.88138880580664,
+    "lon": -1.2938886880874634,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 53.396846771240234,
+        "lengthM": 543,
+        "widthM": 45.19648361206055,
+        "lat": 59.87620811909437,
+        "lon": -1.2866069376468658,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 83.51671600341797,
+        "lengthM": 1314.6163330078125,
+        "widthM": 44,
+        "lat": 59.881481006741524,
+        "lon": -1.2937170267105103,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "33",
+        "headingTrueDeg": 323.43975830078125,
+        "lengthM": 1248.244140625,
+        "widthM": 45.05019760131836,
+        "lat": 59.876053892076015,
+        "lon": -1.2918917834758759,
+        "identReciprocal": "15",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGPI": {
+    "name": "Islay",
+    "lat": 55.68333338946104,
+    "lon": -6.259722411632538,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 120.88387298583984,
+        "lengthM": 1537.515869140625,
+        "widthM": 47.40886688232422,
+        "lat": 55.683467499911785,
+        "lon": -6.2597814202308655,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 70.42276763916016,
+        "lengthM": 631.439453125,
+        "widthM": 17.9915828704834,
+        "lat": 55.683417208492756,
+        "lon": -6.254079043865204,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGPN": {
+    "name": "Dundee",
+    "lat": 56.45250007510185,
+    "lon": -3.0258335173130035,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 90.50343322753906,
+        "lengthM": 1394.196533203125,
+        "widthM": 28.736841201782227,
+        "lat": 56.45241357386112,
+        "lon": -3.0257798731327057,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGPU": {
+    "name": "Tiree",
+    "lat": 56.49916682392359,
+    "lon": -6.869166791439056,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 47.09187698364258,
+        "lengthM": 1473.6102294921875,
+        "widthM": 29.21938133239746,
+        "lat": 56.49924460798502,
+        "lon": -6.869058609008789,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 107.20763397216797,
+        "lengthM": 803.1546020507812,
+        "widthM": 17.8986759185791,
+        "lat": 56.50110874325037,
+        "lon": -6.873071640729904,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 167.257080078125,
+        "lengthM": 788.9561767578125,
+        "widthM": 17.417789459228516,
+        "lat": 56.503565311431885,
+        "lon": -6.876083314418793,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ETNL": {
+    "name": "Rostock-Laage",
+    "lat": 53.918086141347885,
+    "lon": 12.27928876876831,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 97.70577239990234,
+        "lengthM": 2518.392333984375,
+        "widthM": 40,
+        "lat": 53.91809318214655,
+        "lon": 12.279303520917892,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GCXO": {
+    "name": "Los Rodeos",
+    "lat": 28.48277784883976,
+    "lon": -16.341666877269745,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 110.69078826904297,
+        "lengthM": 3398.5654296875,
+        "widthM": 45.24235153198242,
+        "lat": 28.482664190232754,
+        "lon": -16.341533213853836,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFBP": {
+    "name": "Pau/Pyrenees",
+    "lat": 43.380000069737434,
+    "lon": -0.4186110198497772,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 125.89598083496094,
+        "lengthM": 2488.663818359375,
+        "widthM": 44.43435287475586,
+        "lat": 43.38107530027628,
+        "lon": -0.42075008153915405,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFBT": {
+    "name": "Lourdes-Pyrenees",
+    "lat": 43.185555674135685,
+    "lon": -0.00277787446975708,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 200.2891387939453,
+        "lengthM": 2999.10009765625,
+        "widthM": 42.85604476928711,
+        "lat": 43.178651332855225,
+        "lon": -0.006347000598907471,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFCR": {
+    "name": "Marcillac",
+    "lat": 44.40750002861023,
+    "lon": 2.483333498239517,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 129.0637664794922,
+        "lengthM": 2058.309326171875,
+        "widthM": 42.722835540771484,
+        "lat": 44.40790370106697,
+        "lon": 2.4826057255268097,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFKC": {
+    "name": "St Catherine",
+    "lat": 42.524444460868835,
+    "lon": 8.793055415153503,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "36",
+        "headingTrueDeg": 359.8265075683594,
+        "lengthM": 2311.492919921875,
+        "widthM": 39.321372985839844,
+        "lat": 42.53075134009123,
+        "lon": 8.792996406555176,
+        "identReciprocal": "18",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "LFLW": {
+    "name": "Aurillac",
+    "lat": 44.897500053048134,
+    "lon": 2.4166667461395264,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 149.9311981201172,
+        "lengthM": 1697.8026123046875,
+        "widthM": 30.000001907348633,
+        "lat": 44.89112176001072,
+        "lon": 2.4219971895217896,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFMU": {
+    "name": "Vias",
+    "lat": 43.323333375155926,
+    "lon": 3.3533334732055664,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 94.36656951904297,
+        "lengthM": 1996.517822265625,
+        "widthM": 41.58550262451172,
+        "lat": 43.32337662577629,
+        "lon": 3.3546678721904755,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFMV": {
+    "name": "Caumont",
+    "lat": 43.906666561961174,
+    "lon": 4.901944398880005,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 169.00953674316406,
+        "lengthM": 1877.8902587890625,
+        "widthM": 43.75114440917969,
+        "lat": 43.90730693936348,
+        "lon": 4.901822358369827,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17R",
+        "headingTrueDeg": 168.9940948486328,
+        "lengthM": 700.5625610351562,
+        "widthM": 49.37472915649414,
+        "lat": 43.909822180867195,
+        "lon": 4.900262653827667,
+        "identReciprocal": "35L",
+        "surface": "grass"
+      },
+      {
+        "ident": "17L",
+        "headingTrueDeg": 168.98065185546875,
+        "lengthM": 468.8116455078125,
+        "widthM": 33.61441421508789,
+        "lat": 43.90871040523052,
+        "lon": 4.904127269983292,
+        "identReciprocal": "35R",
+        "surface": "grass"
+      }
+    ]
+  },
+  "LFSL": {
+    "name": "Brive Souillac Airport",
+    "lat": 45.03972217440605,
+    "lon": 1.4855557680130005,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "29",
+        "headingTrueDeg": 294.5853271484375,
+        "lengthM": 2102.44140625,
+        "widthM": 43.63945388793945,
+        "lat": 45.04006315022707,
+        "lon": 1.4843733608722687,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LFTW": {
+    "name": "Garons Navy",
+    "lat": 43.75749986618757,
+    "lon": 4.416389018297195,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 177.0135955810547,
+        "lengthM": 2443.645263671875,
+        "widthM": 48,
+        "lat": 43.757429122924805,
+        "lon": 4.416337162256241,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LIMP": {
+    "name": "Parma",
+    "lat": 44.82222218066454,
+    "lon": 10.29527798295021,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 17.291461944580078,
+        "lengthM": 1731.1529541015625,
+        "widthM": 43.99116897583008,
+        "lat": 44.82690900564194,
+        "lon": 10.297198444604874,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LIPK": {
+    "name": "Forli",
+    "lat": 44.19555556029081,
+    "lon": 12.069722414016724,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 296.991455078125,
+        "lengthM": 2554.554443359375,
+        "widthM": 45.3380241394043,
+        "lat": 44.19493228197098,
+        "lon": 12.070554792881012,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LIPO": {
+    "name": "Montichiari",
+    "lat": 45.42888890951872,
+    "lon": 10.330555737018585,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "32",
+        "headingTrueDeg": 315.0372009277344,
+        "lengthM": 2989.075439453125,
+        "widthM": 44.17087936401367,
+        "lat": 45.42857274413109,
+        "lon": 10.33129870891571,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LIRJ": {
+    "name": "Marina Di Campo",
+    "lat": 42.76111118495464,
+    "lon": 10.239722281694412,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "34",
+        "headingTrueDeg": 341.70001220703125,
+        "lengthM": 1250,
+        "widthM": 30,
+        "lat": 42.76117857545614,
+        "lon": 10.239706188440323,
+        "identReciprocal": "16",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LXGB": {
+    "name": "Gibraltar AB",
+    "lat": 36.15116950124502,
+    "lon": -5.34974992275238,
+    "source": "msfs_facility",
+    "validatedAt": "2026-10-10",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 87.59332275390625,
+        "lengthM": 1764.5682373046875,
+        "widthM": 46.8404541015625,
+        "lat": 36.15121979266405,
+        "lon": -5.349802225828171,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

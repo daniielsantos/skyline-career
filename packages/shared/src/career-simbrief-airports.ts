@@ -91,6 +91,7 @@ import { GE_CAREER_HUBS } from './career-ge-hubs.js';
 import { AM_CAREER_HUBS } from './career-am-hubs.js';
 import { AZ_CAREER_HUBS } from './career-az-hubs.js';
 import { LU_CAREER_HUBS } from './career-lu-hubs.js';
+import { GI_CAREER_HUBS } from './career-gi-hubs.js';
 import { MT_CAREER_HUBS } from './career-mt-hubs.js';
 import { CY_CAREER_HUBS } from './career-cy-hubs.js';
 import { XK_CAREER_HUBS } from './career-xk-hubs.js';
@@ -293,6 +294,7 @@ const ALL_CAREER_HUBS: readonly CareerHubRow[] = [
   ...AM_CAREER_HUBS,
   ...AZ_CAREER_HUBS,
   ...LU_CAREER_HUBS,
+  ...GI_CAREER_HUBS,
   ...MT_CAREER_HUBS,
   ...CY_CAREER_HUBS,
   ...XK_CAREER_HUBS,

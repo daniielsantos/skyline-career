@@ -1398,6 +1398,8 @@ function regionLabel(region: string): string {
       return 'Azerbaijan';
     case 'LU-C':
       return 'Luxembourg';
+    case 'GI-C':
+      return 'Gibraltar';
     case 'MT-C':
       return 'Malta';
     case 'CY-C':

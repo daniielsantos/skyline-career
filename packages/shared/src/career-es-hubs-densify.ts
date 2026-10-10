@@ -324,6 +324,16 @@ export const ES_DENSIFY_HUBS: readonly EsDensifyHub[] = [
     produce: { general: 1.1, supplies: 1, perishables: 1.05 },
     consume: { electronics: 0.9, machinery: 0.85 },
   },
+  {
+    icao: 'GCXO',
+    name: 'Tenerife Norte',
+    region: 'ES-CN',
+    hubTier: 'regional',
+    lat: 28.4828,
+    lon: -16.3417,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, general: 1, machinery: 0.9 },
+  },
 ];
 
 export const ES_DENSIFY_HUB_COUNT = ES_DENSIFY_HUBS.length;

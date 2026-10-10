@@ -111,6 +111,7 @@ describe('career partition', () => {
       'GE',
       'GF',
       'GH',
+      'GI',
       'GM',
       'GN',
       'GP',
